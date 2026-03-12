@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+out/
+dist/
+bin/
+obj/
+
+# Turbo
+.turbo/
+
+# Git
+.git/
+.gitignore
+
+# Environment
+.env
+.env.*
+
+# IDE
+.idea/
+.vscode/
+
+# Docs
+docs/
+*.md
+!README.md
+
+# Tests
+coverage/
+**/*.test.*
+**/*.spec.*

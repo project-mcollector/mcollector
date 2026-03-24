@@ -1,4 +1,4 @@
-version: "3"
+version: "3.8"
 
 services:
   postgres:
@@ -9,3 +9,67 @@ services:
       POSTGRES_DB: mcollector
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d mcollector"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ingestion:
+    build:
+      context: ../../apps/api
+      dockerfile: src/Ingestion.Api/Dockerfile
+    ports:
+      - "5001:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=mcollector;Username=app;Password=app
+
+  analytics:
+    build:
+      context: ../../apps/api
+      dockerfile: src/Analytics.Api/Dockerfile
+    ports:
+      - "5002:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=mcollector;Username=app;Password=app
+
+  identity:
+    build:
+      context: ../../apps/api
+      dockerfile: src/Identity.Api/Dockerfile
+    ports:
+      - "5003:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=mcollector;Username=app;Password=app
+
+  processor:
+    build:
+      context: ../../apps/api
+      dockerfile: src/EventProcessor/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=mcollector;Username=app;Password=app
+
+  web:
+    build:
+      context: ../../
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - ingestion
+      - analytics
+      - identity
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:5001

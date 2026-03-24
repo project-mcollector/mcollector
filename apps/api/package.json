@@ -1,7 +1,7 @@
 {
   "name": "api",
   "scripts": {
-    "dev": "dotnet watch run",
-    "build": "dotnet build"
+    "dev": "concurrently --names \"INGEST,ANALYT,IDENT,PROC\" -c \"blue,magenta,cyan,yellow\" \"dotnet run --project src/Ingestion.Api/Ingestion.Api.csproj\" \"dotnet run --project src/Analytics.Api/Analytics.Api.csproj\" \"dotnet run --project src/Identity.Api/Identity.Api.csproj\" \"dotnet run --project src/EventProcessor/EventProcessor.csproj\"",
+    "build": "dotnet build Api.sln"
   }
 }

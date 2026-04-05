@@ -1,4 +1,4 @@
-namespace Contracts;
+namespace Utilities;
 
 public interface IDateTimeProvider
 {

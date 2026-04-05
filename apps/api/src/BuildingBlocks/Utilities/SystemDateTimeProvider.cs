@@ -1,6 +1,4 @@
-using Contracts;
-
-namespace Infrastructure;
+namespace Utilities;
 
 public class SystemDateTimeProvider : IDateTimeProvider
 {

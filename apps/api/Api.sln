@@ -17,7 +17,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Contracts", "src\BuildingBl
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Infrastructure", "src\BuildingBlocks\Infrastructure\Infrastructure.csproj", "{CC84A025-2335-4C63-9442-EE8A55E88F4D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shared", "src\BuildingBlocks\Shared\Shared.csproj", "{D715F0F9-1D65-49C0-A7BF-BD2970A941C9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Utilities", "src\BuildingBlocks\Utilities\Utilities.csproj", "{D715F0F9-1D65-49C0-A7BF-BD2970A941C9}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EventProcessor", "src\EventProcessor\EventProcessor.csproj", "{6E7C1F53-903C-467A-B75C-B5D0644A5477}"
 EndProject

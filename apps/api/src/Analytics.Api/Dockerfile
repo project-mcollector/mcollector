@@ -3,7 +3,7 @@ WORKDIR /src
 
 # Copy just the project files for all layers to facilitate caching
 COPY ["src/Analytics.Api/Analytics.Api.csproj", "src/Analytics.Api/"]
-COPY ["src/BuildingBlocks/Shared/Shared.csproj", "src/BuildingBlocks/Shared/"]
+COPY ["src/BuildingBlocks/Utilities/Utilities.csproj", "src/BuildingBlocks/Utilities/"]
 COPY ["src/BuildingBlocks/Contracts/Contracts.csproj", "src/BuildingBlocks/Contracts/"]
 COPY ["src/BuildingBlocks/Infrastructure/Infrastructure.csproj", "src/BuildingBlocks/Infrastructure/"]
 

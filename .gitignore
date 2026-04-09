@@ -1,6 +1,10 @@
 # Dependencies
 node_modules/
 
+# Appsettings
+appsettings.*.json
+!appsettings.json
+
 # Build outputs
 dist/
 .next/

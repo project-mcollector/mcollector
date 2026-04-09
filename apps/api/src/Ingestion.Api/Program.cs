@@ -1,52 +1,25 @@
-using Infrastructure.Auth;
+using Contracts.Messages;
+using Ingestion.Api.Services;
+using Infrastructure.Messaging;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.Services.AddControllers();
 
-builder.Services.AddAuthorization();
-builder.Services.AddSharedAuthentication(builder.Configuration);
+// Allow the JS SDK to send requests from any origin
+builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
+    p.AllowAnyOrigin()
+        .AllowAnyMethod()
+        .AllowAnyHeader()));
+
+// Stub publisher — replace with Kafka implementation when available
+builder.Services.AddScoped<IEventPublisher, StubEventPublisher>();
+
+// Register the ingestion service
+builder.Services.AddScoped<IIngestionService, IngestionService>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
-
-app.UseHttpsRedirection();
-
-app.UseAuthentication();
-app.UseAuthorization();
-
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", (System.Security.Claims.ClaimsPrincipal user) =>
-{
-    var email = user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
-
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return new { UserEmail = email, Forecast = forecast };
-})
-.WithName("GetWeatherForecast")
-.RequireAuthorization();
-
+app.UseCors();
+app.MapControllers();
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}

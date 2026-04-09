@@ -3,6 +3,7 @@ namespace Contracts.Messages;
 public record RawEvent
 {
     public Guid EventId { get; init; } = Guid.NewGuid();
+    public Guid ProjectId { get; init; }
     public int SchemaVersion { get; init; } = 1;
     public required string EventName { get; init; }
     public required string UserId { get; init; }

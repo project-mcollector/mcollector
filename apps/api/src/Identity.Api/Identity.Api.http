@@ -1,6 +1,44 @@
-@Identity.Api_HostAddress = http://localhost:5196
+@HostAddress = http://localhost:5003
 
-GET {{Identity.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+# 1. Register a new user
+POST {{HostAddress}}/register
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "Password123!"
+}
 
 ###
+
+# 2. Login to get the JWT Token
+POST {{HostAddress}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "Password123!"
+}
+
+> {%
+    client.global.set("auth_token", response.body.accessToken);
+%}
+
+###
+
+# 3. Get current user profile (Requires Authorization)
+GET {{HostAddress}}/users/me
+Authorization: Bearer {{auth_token}}
+
+###
+
+# 4. Create a new project (Requires Authorization)
+POST {{HostAddress}}/projects
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+
+{
+  "name": "My Project",
+  "description": "Created via API tests"
+}
+

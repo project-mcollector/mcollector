@@ -10,4 +10,8 @@ public record ProcessedEvent
     public string? SessionId { get; init; }
     public string? PropertiesJson { get; init; }
     public DateTimeOffset ProcessedAt { get; init; }
+    public DateTimeOffset Timestamp { get; init; }
+    public Dictionary<string, object>? Properties { get; init; }
+    public string? EventCountry { get; init; }
+    public string? EventBrowser { get; set; }
 }

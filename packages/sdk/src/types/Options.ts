@@ -5,4 +5,5 @@ export interface InitOptions {
   batchSize?: number;
   flushInterval?: number;
   cookieDomain?: string;
+  sessionTimeoutConfig?: number;
 }

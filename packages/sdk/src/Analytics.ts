@@ -76,8 +76,26 @@ export class Analytics {
   }
 
   private setupAutoPageTracking() {
+    if (typeof window === 'undefined') return;
 
-    }
+    this.page();
+
+    window.addEventListener('popstate', () => {
+      this.page();
+    });
+
+    const originalPushState = history.pushState;
+    history.pushState = (...args) => {
+      originalPushState.apply(history, args);
+      setTimeout(() => this.page(), 0);
+    };
+
+    const originalReplaceState = history.replaceState;
+    history.replaceState = (...args) => {
+      originalReplaceState.apply(history, args);
+      setTimeout(() => this.page(), 0);
+    };
+  }
 }
 
 

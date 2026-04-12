@@ -1,9 +1,13 @@
 import { defineConfig } from 'tsup';
+import pkg from './package.json';
 
 export default defineConfig({
   entry: ['src/index.ts'],
   format: ['cjs', 'esm', 'iife'],
   globalName: 'mcollector', 
+  env: {
+    __SDK_VERSION__: pkg.version
+  },
   dts: true, 
   sourcemap: true,
   clean: true, 

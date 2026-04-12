@@ -9,6 +9,8 @@ export class Queue {
   private queue: EventPayload[] = [];
   private flushTimer: any = null;
   private isFlushing = false;
+  private retryCount = 0;
+  private readonly MAX_RETRIES = 5;
 
   constructor(writeKey: string, options: InitOptions) {
     this.writeKey = writeKey;
@@ -88,12 +90,24 @@ export class Queue {
       if (this.options.debug) {
         console.log(`[mcollector] Successfully flushed ${batch.length} events.`);
       }
+      this.retryCount = 0; 
     } catch (error) {
+      this.retryCount++;
       if (this.options.debug) {
-        console.error('[mcollector] Flush failed. Restoring queue.', error);
+        console.error(`[mcollector] Flush failed (Attempt ${this.retryCount}/${this.MAX_RETRIES}). Restoring queue.`, error);
       }
       this.queue = [...batch, ...this.queue];
       this.saveQueue();
+
+      if (this.retryCount <= this.MAX_RETRIES) {
+        const backoffDelay = Math.min(1000 * Math.pow(2, this.retryCount), 60000); 
+        setTimeout(() => this.flush(), backoffDelay);
+      } else {
+        if (this.options.debug) {
+          console.error('[mcollector] Max retries reached. Stopping automatic flush until new events arrive.');
+        }
+        this.retryCount = 0;
+      }
     } finally {
       this.isFlushing = false;
     }

@@ -1,6 +1,6 @@
 import { EventContext } from "../types/EventContext";
-import pkg from '../../package.json';
 
+declare const process: any;
 
 export function getEventContext(): EventContext {
   const searchParams = new URLSearchParams(window.location.search);
@@ -24,7 +24,7 @@ export function getEventContext(): EventContext {
     },
     library: {
       name: "mcollector-js",
-      version: pkg.version, 
+      version: typeof process !== 'undefined' && process.env.__SDK_VERSION__ ? process.env.__SDK_VERSION__ : 'unknown', 
     },
     ...(utm && { utm })
   };

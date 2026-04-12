@@ -1,3 +1,4 @@
+/** Main entry point for the Analytics SDK. Exposes initialization and tracking methods (track, identify, page). */
 import { InitOptions } from './types/Options';
 import { Storage } from './core/Storage';
 import { Queue } from './core/Queue';

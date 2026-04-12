@@ -1,3 +1,4 @@
+/** Internal logging utility for debugging purposes. */
 class Logger {
   private isDebugEnabled: boolean = false;
 

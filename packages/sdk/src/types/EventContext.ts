@@ -1,3 +1,4 @@
+/** Type definitions for the contextual data attached to every event (URL, user agent, screen, UTMs). */
 export interface EventContext {
   url: string;
   referrer: string;

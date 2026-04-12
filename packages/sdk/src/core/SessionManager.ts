@@ -1,3 +1,4 @@
+/** Handles user session lifecycle, timeouts, and session ID generation. */
 import { Storage } from './Storage';
 
 const SESSION_ID_KEY = '_mc_sid';

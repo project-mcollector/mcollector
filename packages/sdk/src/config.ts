@@ -1,3 +1,4 @@
+/** Default configuration options for the Analytics SDK. */
 import { InitOptions } from './types/Options';
 
 export const defaultOptions: Required<InitOptions> = {

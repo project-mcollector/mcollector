@@ -1,3 +1,4 @@
+/** Responsible for constructing normalized event payloads with contextual data. */
 import { Storage } from './Storage';
 import { SessionManager } from './SessionManager';
 import { getEventContext } from '../utils/getEventContext';

@@ -1,3 +1,4 @@
+/** Platform-agnostic storage utility (Cookies and LocalStorage) for persisting user and session data. */
 const COOKIE_UID_KEY = '_mc_uid';
 const COOKIE_AID_KEY = '_mc_aid';
 const COOKIE_TRAITS_KEY = '_mc_traits';

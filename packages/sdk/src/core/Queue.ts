@@ -1,3 +1,4 @@
+/** Manages the event queue, batching, and reliable transmission to the ingestion API with exponential backoff. */
 import { EventPayload } from '../types/EventPayload';
 import { InitOptions } from '../types/Options';
 

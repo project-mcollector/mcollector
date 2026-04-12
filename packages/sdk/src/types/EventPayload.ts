@@ -1,3 +1,4 @@
+/** Type definitions for the finalized event structure sent to the ingestion API. */
 import {EventContext} from "./EventContext";
 
 export interface EventPayload {

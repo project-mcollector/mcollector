@@ -1,3 +1,4 @@
+/** Helper function to extract browser and environment context (URL, user agent, UTMs) for events. */
 import { EventContext } from "../types/EventContext";
 
 declare const process: any;

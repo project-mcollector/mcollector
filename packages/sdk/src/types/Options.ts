@@ -1,3 +1,4 @@
+/** Type definitions for the SDK initialization options. */
 export interface InitOptions {
   apiHost?: string;
   debug?: boolean;

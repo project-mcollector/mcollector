@@ -1,33 +1,37 @@
 using Contracts.Messages;
 using EventProcessor.Contracts;
 using Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace EventProcessor;
 
-public class EventRepository : IProcessedEventRepository
+public class EventRepository(EventProcessorDbContext dbContext) : IProcessedEventRepository
 {
     public Task<ProcessedEvent?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        return dbContext.ProcessedEvents.FirstOrDefaultAsync(e => e.EventId == id, cancellationToken);
     }
 
-    public Task AddAsync(ProcessedEvent entity, CancellationToken cancellationToken = default)
+    public async Task AddAsync(ProcessedEvent entity, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        await dbContext.ProcessedEvents.AddAsync(entity, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public Task UpdateAsync(ProcessedEvent entity, CancellationToken cancellationToken = default)
+    public async Task UpdateAsync(ProcessedEvent entity, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        dbContext.ProcessedEvents.Update(entity);
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public Task DeleteAsync(ProcessedEvent entity, CancellationToken cancellationToken = default)
+    public async Task DeleteAsync(ProcessedEvent entity, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        dbContext.ProcessedEvents.Remove(entity);
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public Task<bool> ExistsByEventIdAsync(Guid eventId, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        return dbContext.ProcessedEvents.AnyAsync(e => e.EventId == eventId, cancellationToken);
     }
 }

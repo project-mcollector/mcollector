@@ -13,7 +13,6 @@ obj/
 
 # Git
 .git/
-.gitignore
 
 # Environment
 .env

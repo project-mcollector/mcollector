@@ -14,9 +14,9 @@ public class EventProcessorDbContext(DbContextOptions<EventProcessorDbContext> o
         modelBuilder.Entity<ProcessedEvent>(entity =>
         {
             entity.HasKey(e => e.EventId);
+            entity.Ignore(e => e.Properties);
 
             entity.ToTable("processed_events");
         });
     }
 }
-

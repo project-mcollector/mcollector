@@ -14,7 +14,7 @@ builder.Services.AddControllers();
 builder.Services.AddDbContext<AnalyticsDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("Database") ??
-                           "Host=localhost;Database=analyticsdb;Username=postgres;Password=postgres";
+                           "Host=localhost;Port=5433;Database=analyticsdb;Username=postgres;Password=postgres";
     options.UseNpgsql(connectionString);
 });
 

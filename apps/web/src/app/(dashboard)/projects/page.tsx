@@ -14,6 +14,8 @@ type CreatedProject = {
   apiKey: string
 }
 
+const BASE_URL = 'http://localhost:PORT'
+
 export default function ProjectsPage() {
   const router = useRouter()
   const [projects, setProjects] = useState<Project[]>([])
@@ -28,7 +30,7 @@ export default function ProjectsPage() {
       return
     }
 
-    fetch('http://localhost:PORT/api/projects', {
+    fetch(`${BASE_URL}/api/projects`, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(res => res.json())
@@ -43,7 +45,7 @@ export default function ProjectsPage() {
     if (!newProjectName.trim()) return
     const token = localStorage.getItem('token')
 
-    const res = await fetch('http://localhost:PORT/api/projects', {
+    const res = await fetch(`${BASE_URL}/api/projects`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

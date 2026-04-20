@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import styles from '../login.module.css'
 
 const BASE_URL = 'http://localhost:PORT'
 
@@ -32,34 +33,51 @@ export default function LoginPage() {
   }
 
   return (
-    <div>
-      <h1>Вход</h1>
-      {error && <p>{error}</p>}
-      <form onSubmit={handleSubmit}>
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-          />
-        </label>
-        <label>
-          Password
-          <input
-          type="password"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-        />
-        </label>
-        <label>
-          <button type="submit">Войти</button>
-        </label>
+    <div className={styles.page}>
+      <div className={styles.card}>
 
-      </form>
-      <p>
-        Нет аккаунта? <Link href="/register">Зарегистрироваться</Link>
-      </p>
+        <h1 className={styles.title}>MCollector</h1>
+        <p className={styles.subtitle}>Аналитика для вашего сайта</p>
+
+        <form onSubmit={handleSubmit} className={styles.form}>
+
+          {error && (
+            <div className={styles.error}>{error}</div>
+          )}
+
+          <div>
+            <label className={styles.label}>Email</label>
+            <input
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              className={styles.input}
+            />
+          </div>
+
+          <div>
+            <label className={styles.label}>Пароль</label>
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              className={styles.input}
+            />
+          </div>
+
+          <button type="submit" className={styles.button}>
+            Войти
+          </button>
+          <p className={styles.linkText}>
+            Нет аккаунта?{' '}
+            <Link href="/register" className={styles.link}>
+              Зарегистрироваться
+            </Link>
+          </p>
+        </form>
+      </div>
     </div>
   )
 }

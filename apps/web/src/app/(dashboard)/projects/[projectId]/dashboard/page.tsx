@@ -11,7 +11,7 @@ import {
   ResponsiveContainer
 } from 'recharts'
 
-const BASE_URL = 'http://localhost:5000'
+const BASE_URL = 'http://localhost:5002'
 
 type Overview = {
   totalEvents: number
@@ -42,12 +42,12 @@ export default function DashboardPage() {
     const to = new Date().toISOString()
     const from = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
     const headers = { Authorization: `Bearer ${token}` }
-    const base = `${BASE_URL}/api/v1/projects/${projectId}/analytics`
+    const base = `${BASE_URL}/api/analytics`
 
     Promise.all([
-      fetch(`${base}/overview?from=${from}&to=${to}`, { headers }).then(r => r.json()),
-      fetch(`${base}/events/timeseries?from=${from}&to=${to}&interval=day`, { headers }).then(r => r.json()),
-      fetch(`${base}/users/timeseries?from=${from}&to=${to}&interval=day`, { headers }).then(r => r.json()),
+      fetch(`${base}/overview?projectId=${projectId}&from=${from}&to=${to}`, { headers }).then(r => r.json()),
+      fetch(`${base}/events/timeseries?projectId=${projectId}&from=${from}&to=${to}&interval=day`, { headers }).then(r => r.json()),
+      fetch(`${base}/users/timeseries?projectId=${projectId}&from=${from}&to=${to}&interval=day`, { headers }).then(r => r.json()),
     ]).then(([overviewData, eventsData, usersData]) => {
       setOverview(overviewData)
       setEventsTimeseries(eventsData)

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import styles from '../login.module.css'
 
-const BASE_URL = 'http://localhost:PORT'
+const BASE_URL = 'http://localhost:5003'
 export default function RegisterPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
@@ -32,7 +32,7 @@ export default function RegisterPage() {
     setLoading(true)
 
     try {
-      const res = await fetch(`${BASE_URL}/api/auth/register`, {
+      const res = await fetch(`${BASE_URL}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -42,15 +42,36 @@ export default function RegisterPage() {
         })
       })
 
-      const data = await res.json()
-
       if (!res.ok) {
-        setError(data.message || 'Ошибка регистрации')
+        let msg = 'Ошибка регистрации'
+        try {
+          const errData = await res.json()
+          if (errData.errors) {
+            const firstKey = Object.keys(errData.errors)[0]
+            if (firstKey) msg = errData.errors[firstKey][0]
+          } else if (errData.title) {
+            msg = errData.title
+          }
+        } catch { } // if not json
+
+        setError(msg)
         return
       }
 
-      localStorage.setItem('token', data.token)
-      router.push('/projects')
+      // Successful registration
+      const loginRes = await fetch(`${BASE_URL}/Auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      })
+
+      if (loginRes.ok) {
+        const data = await loginRes.json()
+        localStorage.setItem('token', data.accessToken)
+        router.push('/projects')
+      } else {
+        router.push('/login')
+      }
     } catch (err) {
       setError('Ошибка соединения с сервером')
     } finally {

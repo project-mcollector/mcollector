@@ -20,6 +20,7 @@ public class AnalyticsDbContext(DbContextOptions<AnalyticsDbContext> options) : 
             entity.Property(e => e.EventName).IsRequired();
             entity.Property(e => e.UserId).IsRequired();
             entity.Property(e => e.PropertiesJson).HasColumnType("jsonb");
+            entity.Ignore(e => e.Properties);
         });
     }
 }

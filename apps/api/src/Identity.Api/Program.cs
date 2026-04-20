@@ -5,8 +5,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Protocols.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Configuration.AddEnvironmentVariables();
+
 var unsupportedIdentityPaths = new[]
-    { "/login", "/forgotPassword", "/resetPassword", "/confirmEmail", "/resendConfirmationEmail", "/manage/2fa" };
+    { "/forgotPassword", "/resetPassword", "/confirmEmail", "/resendConfirmationEmail", "/manage/2fa" };
 
 builder.Services.AddOpenApi(options =>
 {
@@ -28,8 +31,14 @@ builder.Services.AddSharedAuthentication(builder.Configuration);
 
 builder.Services.AddDbContext<IdentityAppDbContext>(options =>
 {
-    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ??
-                           throw new InvalidConfigurationException("Provide a connection string in configuration");
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+    if (string.IsNullOrEmpty(connectionString))
+    {
+        connectionString = builder.Configuration["ConnectionStrings:DefaultConnection"]
+                           ?? Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+                           ?? "Host=postgres;Database=mcollector;Username=app;Password=app";
+    }
+
     options.UseNpgsql(connectionString);
 });
 
@@ -38,7 +47,23 @@ builder.Services.AddIdentityApiEndpoints<ApplicationUser>()
 
 builder.Services.AddControllers();
 
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.WithOrigins("http://localhost:3000")
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<IdentityAppDbContext>();
+    dbContext.Database.Migrate();
+}
 
 if (app.Environment.IsDevelopment())
 {
@@ -47,6 +72,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseCors();
 
 app.UseAuthentication();
 app.UseAuthorization();

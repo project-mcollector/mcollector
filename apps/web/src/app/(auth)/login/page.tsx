@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import styles from '../login.module.css'
 
-const BASE_URL = 'http://localhost:PORT'
+const BASE_URL = 'http://localhost:5003'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -16,7 +16,7 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
-    const res = await fetch(`${BASE_URL}/api/auth/login`, {
+    const res = await fetch(`${BASE_URL}/Auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
@@ -28,7 +28,7 @@ export default function LoginPage() {
     }
 
     const data = await res.json()
-    localStorage.setItem('token', data.token)
+    localStorage.setItem('token', data.accessToken)
     router.push('/projects')
   }
 

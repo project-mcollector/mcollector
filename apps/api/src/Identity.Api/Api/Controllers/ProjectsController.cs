@@ -13,6 +13,28 @@ namespace Identity.Api.Api.Controllers;
 public class ProjectsController(UserManager<ApplicationUser> userManager, IdentityAppDbContext dbContext)
     : ControllerBase
 {
+    [HttpGet]
+    [ProducesResponseType(typeof(List<ProjectResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetProjects()
+    {
+        var user = await userManager.GetUserAsync(User);
+        if (user is null) return Unauthorized();
+
+        var projects = await dbContext.Projects
+            .Where(p => p.Users.Any(u => u.Id == user.Id))
+            .Select(p => new ProjectResponse
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Description = p.Description,
+                ApiKey = p.ApiKey
+            })
+            .ToListAsync();
+
+        return Ok(projects);
+    }
+
     [HttpPost]
     [ProducesResponseType(typeof(ProjectResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -34,7 +56,7 @@ public class ProjectsController(UserManager<ApplicationUser> userManager, Identi
 
         await dbContext.SaveChangesAsync();
 
-        return Ok(new ProjectResponse { Id = project.Id, Name = project.Name, Description = project.Description });
+        return Ok(new ProjectResponse { Id = project.Id, Name = project.Name, Description = project.Description, ApiKey = project.ApiKey });
     }
 
     [HttpGet("{id:guid}")]
@@ -48,6 +70,7 @@ public class ProjectsController(UserManager<ApplicationUser> userManager, Identi
                 Id = project.Id,
                 Name = project.Name,
                 Description = project.Description,
+                ApiKey = project.ApiKey,
                 Members = project.Users.Select(u => new ProjectMemberDto { Id = u.Id, Email = u.Email ?? string.Empty })
                     .ToList()
             }));
@@ -64,7 +87,7 @@ public class ProjectsController(UserManager<ApplicationUser> userManager, Identi
 
             await dbContext.SaveChangesAsync();
 
-            return Ok(new ProjectResponse { Id = project.Id, Name = project.Name, Description = project.Description });
+            return Ok(new ProjectResponse { Id = project.Id, Name = project.Name, Description = project.Description, ApiKey = project.ApiKey });
         });
 
     [HttpDelete("{id:guid}")]
@@ -168,6 +191,7 @@ public class ProjectResponse
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
+    public string ApiKey { get; set; } = string.Empty;
 }
 
 public class ProjectWithMembersResponse : ProjectResponse

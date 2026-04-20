@@ -11,10 +11,22 @@ builder.Services.AddOpenApi();
 
 builder.Services.AddControllers();
 
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.WithOrigins("http://localhost:3000") // front-end
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+
 builder.Services.AddDbContext<AnalyticsDbContext>(options =>
 {
-    var connectionString = builder.Configuration.GetConnectionString("Database") ??
-                           "Host=localhost;Port=5433;Database=analyticsdb;Username=postgres;Password=postgres";
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ??
+        builder.Configuration["ConnectionStrings:DefaultConnection"] ??
+        Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection") ??
+        "Host=postgres;Database=mcollector;Username=app;Password=app";
     options.UseNpgsql(connectionString);
 });
 
@@ -30,6 +42,12 @@ builder.Services.AddSharedAuthentication(builder.Configuration);
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<AnalyticsDbContext>();
+    dbContext.Database.Migrate();
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -37,6 +55,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseCors();
 
 app.UseAuthentication();
 app.UseAuthorization();

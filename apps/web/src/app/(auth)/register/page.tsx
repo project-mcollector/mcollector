@@ -3,6 +3,10 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+<<<<<<< HEAD
+=======
+import styles from '../login.module.css'
+>>>>>>> feature/web-dashboard
 
 const BASE_URL = 'http://localhost:PORT'
 export default function RegisterPage() {
@@ -58,6 +62,7 @@ export default function RegisterPage() {
   }
 
   return (
+<<<<<<< HEAD
     <div className="auth-container">
       <h1>Регистрация</h1>
       {error && <p className="error">{error}</p>}
@@ -112,6 +117,85 @@ export default function RegisterPage() {
       <p>
         Уже есть аккаунт? <Link href="/login">Войти</Link>
       </p>
+=======
+    <div className={styles.page}>
+      <div className={styles.card}>
+
+        <h1 className={styles.title}>MCollector</h1>
+        <p className={styles.subtitle}>Создайте аккаунт</p>
+
+        <form onSubmit={handleSubmit} className={styles.form}>
+
+          {error && <div className={styles.error}>{error}</div>}
+
+          <div>
+            <label className={styles.label}>Email</label>
+            <input
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              required
+              className={styles.input}
+            />
+          </div>
+
+          <div>
+            <label className={styles.label}>Название организации</label>
+            <input
+              type="text"
+              placeholder="Моя компания"
+              value={organizationName}
+              onChange={e => setOrganizationName(e.target.value)}
+              required
+              className={styles.input}
+            />
+          </div>
+
+          <div>
+            <label className={styles.label}>Пароль</label>
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+              minLength={8}
+              className={styles.input}
+            />
+          </div>
+
+          <div>
+            <label className={styles.label}>Подтвердите пароль</label>
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={confirmPassword}
+              onChange={e => setConfirmPassword(e.target.value)}
+              required
+              className={styles.input}
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className={styles.button}
+          >
+            {loading ? 'Регистрация...' : 'Зарегистрироваться'}
+          </button>
+
+        </form>
+
+        <p className={styles.linkText}>
+          Уже есть аккаунт?{' '}
+          <Link href="/login" className={styles.link}>
+            Войти
+          </Link>
+        </p>
+
+      </div>
+>>>>>>> feature/web-dashboard
     </div>
   )
 }

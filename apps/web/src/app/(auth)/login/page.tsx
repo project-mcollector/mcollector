@@ -3,10 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-<<<<<<< HEAD
-=======
 import styles from '../login.module.css'
->>>>>>> feature/web-dashboard
 
 const BASE_URL = 'http://localhost:PORT'
 
@@ -36,36 +33,6 @@ export default function LoginPage() {
   }
 
   return (
-<<<<<<< HEAD
-    <div>
-      <h1>Вход</h1>
-      {error && <p>{error}</p>}
-      <form onSubmit={handleSubmit}>
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-          />
-        </label>
-        <label>
-          Password
-          <input
-          type="password"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-        />
-        </label>
-        <label>
-          <button type="submit">Войти</button>
-        </label>
-
-      </form>
-      <p>
-        Нет аккаунта? <Link href="/register">Зарегистрироваться</Link>
-      </p>
-=======
     <div className={styles.page}>
       <div className={styles.card}>
 
@@ -111,7 +78,6 @@ export default function LoginPage() {
           </p>
         </form>
       </div>
->>>>>>> feature/web-dashboard
     </div>
   )
 }

@@ -3,10 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-<<<<<<< HEAD
-=======
 import styles from '../login.module.css'
->>>>>>> feature/web-dashboard
 
 const BASE_URL = 'http://localhost:PORT'
 export default function RegisterPage() {
@@ -62,62 +59,6 @@ export default function RegisterPage() {
   }
 
   return (
-<<<<<<< HEAD
-    <div className="auth-container">
-      <h1>Регистрация</h1>
-      {error && <p className="error">{error}</p>}
-
-      <form onSubmit={handleSubmit}>
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            required
-          />
-        </label>
-
-        <label>
-          Название организации
-          <input
-            type="text"
-            value={organizationName}
-            onChange={e => setOrganizationName(e.target.value)}
-            required
-          />
-        </label>
-
-        <label>
-          Пароль
-          <input
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            required
-            minLength={8}
-          />
-        </label>
-
-        <label>
-          Подтвердите пароль
-          <input
-            type="password"
-            value={confirmPassword}
-            onChange={e => setConfirmPassword(e.target.value)}
-            required
-          />
-        </label>
-
-        <button type="submit" disabled={loading}>
-          {loading ? 'Регистрация...' : 'Зарегистрироваться'}
-        </button>
-      </form>
-
-      <p>
-        Уже есть аккаунт? <Link href="/login">Войти</Link>
-      </p>
-=======
     <div className={styles.page}>
       <div className={styles.card}>
 
@@ -195,7 +136,6 @@ export default function RegisterPage() {
         </p>
 
       </div>
->>>>>>> feature/web-dashboard
     </div>
   )
 }

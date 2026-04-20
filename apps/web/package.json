@@ -1,31 +1,8 @@
 {
   "name": "web",
-  "version": "0.1.0",
-  "private": true,
+  "version": "1.0.0",
+  "description": "Vanilla JS frontend for MCollector Dashboard",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "next": "16.1.6",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
-    "recharts": "^3.8.1"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.2",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.1.6",
-    "jest": "^30.3.0",
-    "jest-environment-jsdom": "^30.3.0",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "start": "npx serve ."
   }
 }

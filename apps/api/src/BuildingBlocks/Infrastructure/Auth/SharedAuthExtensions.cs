@@ -12,7 +12,6 @@ public static class SharedAuthExtensions
         IConfiguration configuration)
     {
         var jwtSecret = configuration["Jwt:Secret"] ?? "super-secret-default-key-for-dev-mcollector";
-
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {

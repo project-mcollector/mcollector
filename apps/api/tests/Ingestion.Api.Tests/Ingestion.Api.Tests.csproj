@@ -20,7 +20,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\apps\api\src\Ingestion.Api\Ingestion.Api.csproj" />
     <ProjectReference Include="..\..\src\Ingestion.Api\Ingestion.Api.csproj" />
   </ItemGroup>
 

@@ -4,25 +4,13 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Ingestion.Api.Controllers;
 
-/// <summary>
-/// Handles HTTP requests from the JS tracking SDK.
-/// Validates payload and passes events to the ingestion service.
-/// </summary>
 [ApiController]
 [Route("api/v1/ingest")]
 public class IngestionController(IIngestionService ingestionService) : ControllerBase
 {
-    /// <summary>
-    /// Health check endpoint.
-    /// GET /api/v1/ingest/health
-    /// </summary>
     [HttpGet("health")]
     public IActionResult Health() => Ok(new { status = "ok" });
 
-    /// <summary>
-    /// Accepts a single event from the SDK.
-    /// POST /api/v1/ingest/event
-    /// </summary>
     [HttpPost("event")]
     public async Task<IActionResult> IngestEvent(
         [FromHeader(Name = "X-Project-Id")] Guid projectId,
@@ -42,7 +30,6 @@ public class IngestionController(IIngestionService ingestionService) : Controlle
         if (string.IsNullOrWhiteSpace(request.UserId) && string.IsNullOrWhiteSpace(request.AnonymousId))
             return BadRequest(new { error = "userId or anonymousId is required" });
 
-        // Map SDK request to RawEvent
         var rawEvent = new RawEvent
         {
             ProjectId       = projectId,
@@ -61,10 +48,6 @@ public class IngestionController(IIngestionService ingestionService) : Controlle
         return Accepted();
     }
 
-    /// <summary>
-    /// Accepts a batch of events from the SDK (max 50).
-    /// POST /api/v1/ingest/batch
-    /// </summary>
     [HttpPost("batch")]
     public async Task<IActionResult> IngestBatch(
         [FromHeader(Name = "X-Project-Id")] Guid projectId,
@@ -81,7 +64,6 @@ public class IngestionController(IIngestionService ingestionService) : Controlle
         if (requests.Count > 50)
             return BadRequest(new { error = "Batch size cannot exceed 50 events" });
 
-        // Map each SDK request to RawEvent
         var rawEvents = requests.Select(r => new RawEvent
         {
             ProjectId       = projectId,

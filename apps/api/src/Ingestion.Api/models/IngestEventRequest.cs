@@ -1,8 +1,5 @@
 namespace Ingestion.Api.Models;
 
-/// <summary>
-/// Raw event payload received from the JS tracking SDK.
-/// </summary>
 public class IngestEventRequest
 {
     public required string EventName { get; set; }

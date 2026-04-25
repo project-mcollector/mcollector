@@ -1,25 +1,17 @@
+using System.Text.Json;
+using Confluent.Kafka;
 using Contracts.Messages;
 using Infrastructure.Messaging;
 
 namespace Ingestion.Api.Services;
 
-/// <summary>
-/// Handles incoming events from the JS SDK.
-/// Publishes raw events to the event bus (Kafka).
-/// </summary>
 public class IngestionService(IEventPublisher publisher) : IIngestionService
 {
-    /// <summary>
-    /// Publishes a single raw event to the event bus.
-    /// </summary>
     public async Task IngestAsync(RawEvent rawEvent, CancellationToken cancellationToken = default)
     {
         await publisher.PublishAsync(rawEvent, cancellationToken);
     }
 
-    /// <summary>
-    /// Publishes a batch of raw events to the event bus.
-    /// </summary>
     public async Task IngestBatchAsync(IEnumerable<RawEvent> rawEvents, CancellationToken cancellationToken = default)
     {
         foreach (var rawEvent in rawEvents)
@@ -27,16 +19,21 @@ public class IngestionService(IEventPublisher publisher) : IIngestionService
     }
 }
 
-/// <summary>
-/// Temporary stub for IEventPublisher until Kafka is configured.
-/// Replace with real Kafka implementation when available.
-/// </summary>
-public class StubEventPublisher : IEventPublisher
+public class KafkaEventPublisher(IConfiguration configuration) : IEventPublisher
 {
-    public Task PublishAsync<T>(T message, CancellationToken cancellationToken = default)
+    private readonly string _bootstrapServers =
+        configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
+
+    private readonly string _topic =
+        configuration["Kafka:Topic"] ?? "raw-events";
+
+    public async Task PublishAsync<T>(T message, CancellationToken cancellationToken = default)
         where T : class
     {
-        Console.WriteLine($"[STUB] Event published: {typeof(T).Name}");
-        return Task.CompletedTask;
+        var config = new ProducerConfig { BootstrapServers = _bootstrapServers };
+        using var producer = new ProducerBuilder<Null, string>(config).Build();
+
+        var json = JsonSerializer.Serialize(message);
+        await producer.ProduceAsync(_topic, new Message<Null, string> { Value = json }, cancellationToken);
     }
 }

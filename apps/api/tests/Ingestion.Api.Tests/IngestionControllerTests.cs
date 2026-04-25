@@ -25,7 +25,6 @@ public class IngestionControllerTests
     [Fact]
     public async Task IngestEvent_ValidRequest_ReturnsAccepted()
     {
-        // Arrange
         var mockService = new Mock<IIngestionService>();
         var controller = CreateController(mockService);
 
@@ -38,14 +37,12 @@ public class IngestionControllerTests
 
         var projectId = Guid.NewGuid();
 
-        // Act
         var result = await controller.IngestEvent(
             projectId,
             "api-key",
             request,
             CancellationToken.None);
 
-        // Assert
         Assert.IsType<AcceptedResult>(result);
         mockService.Verify(x => x.IngestAsync(It.IsAny<RawEvent>(), It.IsAny<CancellationToken>()), Times.Once);
     }

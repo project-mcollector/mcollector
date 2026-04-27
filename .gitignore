@@ -4,6 +4,9 @@ node_modules/
 # Appsettings
 appsettings.*.json
 !appsettings.json
+!apps/api/src/Analytics.Api/appsettings.Development.json
+!apps/api/src/EventProcessor/appsettings.Development.json
+!apps/api/src/Ingestion.Api/appsettings.Development.json
 
 # Build outputs
 dist/
@@ -35,6 +38,9 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
+
+# Package manager lockfiles
+package-lock.json
 
 # Testing
 coverage/

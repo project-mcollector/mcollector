@@ -1,29 +1,27 @@
 using Contracts.Messages;
 using Ingestion.Api.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Ingestion.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/ingest")]
+[Authorize]
 public class IngestionController(IIngestionService ingestionService) : ControllerBase
 {
     [HttpGet("health")]
+    [AllowAnonymous]
     public IActionResult Health() => Ok(new { status = "ok" });
 
     [HttpPost("event")]
     public async Task<IActionResult> IngestEvent(
         [FromHeader(Name = "X-Project-Id")] Guid projectId,
-        [FromHeader(Name = "X-Api-Key")] string apiKey,
         [FromBody] IngestEventRequest request,
         CancellationToken cancellationToken)
     {
-        if (projectId == Guid.Empty)
-            return BadRequest(new { error = "X-Project-Id is required" });
-
-        if (string.IsNullOrWhiteSpace(apiKey))
-            return BadRequest(new { error = "X-Api-Key is required" });
-
+        // Headers are validated by authentication handler
+        
         if (string.IsNullOrWhiteSpace(request.EventName))
             return BadRequest(new { error = "eventName is required" });
 
@@ -51,16 +49,11 @@ public class IngestionController(IIngestionService ingestionService) : Controlle
     [HttpPost("batch")]
     public async Task<IActionResult> IngestBatch(
         [FromHeader(Name = "X-Project-Id")] Guid projectId,
-        [FromHeader(Name = "X-Api-Key")] string apiKey,
         [FromBody] List<IngestEventRequest> requests,
         CancellationToken cancellationToken)
     {
-        if (projectId == Guid.Empty)
-            return BadRequest(new { error = "X-Project-Id is required" });
-
-        if (string.IsNullOrWhiteSpace(apiKey))
-            return BadRequest(new { error = "X-Api-Key is required" });
-
+        // Headers are validated by authentication handler
+        
         if (requests.Count > 50)
             return BadRequest(new { error = "Batch size cannot exceed 50 events" });
 

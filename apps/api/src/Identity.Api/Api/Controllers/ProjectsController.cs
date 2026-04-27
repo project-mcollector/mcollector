@@ -1,3 +1,4 @@
+using Identity.Api.Application.Services;
 using Identity.Api.Infrastructure.Identity;
 using Identity.Api.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
@@ -10,7 +11,7 @@ namespace Identity.Api.Api.Controllers;
 [ApiController]
 [Route("[controller]")]
 [Authorize]
-public class ProjectsController(UserManager<ApplicationUser> userManager, IdentityAppDbContext dbContext)
+public class ProjectsController(UserManager<ApplicationUser> userManager, IdentityAppDbContext dbContext, IApiKeyService apiKeyService)
     : ControllerBase
 {
     [HttpGet]
@@ -48,7 +49,8 @@ public class ProjectsController(UserManager<ApplicationUser> userManager, Identi
         var project = new Project
         {
             Name = request.Name,
-            Description = request.Description ?? string.Empty
+            Description = request.Description ?? string.Empty,
+            ApiKey = apiKeyService.GenerateApiKey()
         };
 
         project.Users.Add(dbUser ?? throw new InvalidOperationException("User not found"));
@@ -101,6 +103,25 @@ public class ProjectsController(UserManager<ApplicationUser> userManager, Identi
             await dbContext.SaveChangesAsync();
 
             return NoContent();
+        });
+
+    [HttpPost("{id:guid}/api-key/regenerate")]
+    [ProducesResponseType(typeof(ProjectResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public Task<IActionResult> RegenerateApiKey(Guid id)
+        => ExecuteWithProjectAsync(id, async project =>
+        {
+            project.ApiKey = apiKeyService.GenerateApiKey();
+            await dbContext.SaveChangesAsync();
+
+            return Ok(new ProjectResponse
+            {
+                Id = project.Id,
+                Name = project.Name,
+                Description = project.Description,
+                ApiKey = project.ApiKey
+            });
         });
 
     [HttpPost("{id:guid}/members")]

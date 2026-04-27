@@ -1,6 +1,8 @@
 using Contracts.Messages;
+using Infrastructure.Auth;
 using Infrastructure.Messaging;
 using Ingestion.Api.Services;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,11 +13,29 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
         .AllowAnyMethod()
         .AllowAnyHeader()));
 
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? builder.Configuration["ConnectionStrings:DefaultConnection"]
+    ?? Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+    ?? "Host=postgres;Database=mcollector;Username=app;Password=app";
+
+builder.Services.AddDbContext<IdentityValidationContext>(options =>
+    options.UseNpgsql(connectionString));
+
+builder.Services.AddScoped<IApiKeyValidator, ApiKeyValidator>();
 builder.Services.AddScoped<IEventPublisher, KafkaEventPublisher>();
 builder.Services.AddScoped<IIngestionService, IngestionService>();
 
+builder.Services.AddApiKeyAuthentication();
+
+builder.Services.AddAuthorizationBuilder()
+    .SetDefaultPolicy(new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build());
+
 var app = builder.Build();
 
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseCors();
 app.MapControllers();
 app.Run();

@@ -10,8 +10,17 @@ import {
   Tooltip,
   ResponsiveContainer
 } from 'recharts'
+import styles from '../../dashboard.module.css'
 
 const BASE_URL = 'http://localhost:5000'
+
+function getDateRange() {
+  const now = Date.now()
+  return {
+    to: new Date(now).toISOString(),
+    from: new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString()
+  }
+}
 
 type Overview = {
   totalEvents: number
@@ -24,6 +33,11 @@ type TimeseriesPoint = {
   count: number
 }
 
+type EventName = {
+  eventName: string
+  count: number
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const { projectId } = useParams()
@@ -31,6 +45,9 @@ export default function DashboardPage() {
   const [overview, setOverview] = useState<Overview | null>(null)
   const [eventsTimeseries, setEventsTimeseries] = useState<TimeseriesPoint[]>([])
   const [usersTimeseries, setUsersTimeseries] = useState<TimeseriesPoint[]>([])
+  const [eventNames, setEventNames] = useState<EventName[]>([])
+  const [selectedEvent, setSelectedEvent] = useState<string | null>(null)
+  const [selectedEventTimeseries, setSelectedEventTimeseries] = useState<TimeseriesPoint[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -39,8 +56,8 @@ export default function DashboardPage() {
       router.push('/login')
       return
     }
-    const to = new Date().toISOString()
-    const from = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
+    const { to, from } = getDateRange()
     const headers = { Authorization: `Bearer ${token}` }
     const base = `${BASE_URL}/api/v1/projects/${projectId}/analytics`
 
@@ -48,55 +65,144 @@ export default function DashboardPage() {
       fetch(`${base}/overview?from=${from}&to=${to}`, { headers }).then(r => r.json()),
       fetch(`${base}/events/timeseries?from=${from}&to=${to}&interval=day`, { headers }).then(r => r.json()),
       fetch(`${base}/users/timeseries?from=${from}&to=${to}&interval=day`, { headers }).then(r => r.json()),
-    ]).then(([overviewData, eventsData, usersData]) => {
+      fetch(`${base}/events?projectId=${projectId}`, { headers }).then(r => r.json()),
+    ]).then(([overviewData, eventsData, usersData, eventNamesData]) => {
       setOverview(overviewData)
       setEventsTimeseries(eventsData)
       setUsersTimeseries(usersData)
+      setEventNames(eventNamesData)
       setLoading(false)
     })
   }, [projectId, router])
 
-  if (loading) return <p>Загрузка...</p>
-  if (!overview) return <p>Нет данных</p>
+  function handleEventClick(eventName: string) {
+    const token = localStorage.getItem('token')
+    if (!token) return
+
+    if (selectedEvent === eventName) {
+      setSelectedEvent(null)
+      setSelectedEventTimeseries([])
+      return
+    }
+
+    const { to, from } = getDateRange()
+    const headers = { Authorization: `Bearer ${token}` }
+    const base = `${BASE_URL}/api/v1/projects/${projectId}/analytics`
+
+    fetch(
+      `${base}/events/timeseries?from=${from}&to=${to}&interval=day&eventName=${eventName}`,
+      { headers }
+    )
+      .then(r => r.json())
+      .then(data => {
+        setSelectedEvent(eventName)
+        setSelectedEventTimeseries(data)
+      })
+  }
+
+  if (loading) return <p className={styles.emptyState}>Загрузка...</p>
+  if (!overview) return <p className={styles.emptyState}>Нет данных</p>
 
   return (
-    <div>
-      <h1>Дашборд</h1>
+    <div className={styles.page}>
 
-      <div>
+      <div className={styles.header}>
         <div>
-          <p>События</p>
-          <p>{overview.totalEvents}</p>
+          <h1 className={styles.title}>Дашборд</h1>
         </div>
-        <div>
-          <p>Пользователи</p>
-          <p>{overview.uniqueUsers}</p>
+        <button
+          className={styles.buttonOutline}
+          onClick={() => router.push('/projects')}
+        >
+          ← Мои проекты
+        </button>
+      </div>
+
+      <div className={styles.statsGrid}>
+        <div className={styles.statCard}>
+          <p className={styles.statLabel}>События</p>
+          <p className={styles.statValue}>{overview.totalEvents}</p>
         </div>
-        <div>
-          <p>Просмотры страниц</p>
-          <p>{overview.pageViews}</p>
+        <div className={styles.statCard}>
+          <p className={styles.statLabel}>Пользователи</p>
+          <p className={styles.statValue}>{overview.uniqueUsers}</p>
+        </div>
+        <div className={styles.statCard}>
+          <p className={styles.statLabel}>Просмотры страниц</p>
+          <p className={styles.statValue}>{overview.pageViews}</p>
         </div>
       </div>
 
-      <h2>События по дням</h2>
-      <ResponsiveContainer width="100%" height={300}>
-        <LineChart data={eventsTimeseries}>
-          <XAxis dataKey="timestamp" />
-          <YAxis />
-          <Tooltip />
-          <Line type="monotone" dataKey="count" stroke="#8884d8" />
-        </LineChart>
-      </ResponsiveContainer>
+      <div className={styles.chartSection}>
+        <h2 className={styles.chartTitle}>События по дням</h2>
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={eventsTimeseries}>
+            <XAxis dataKey="timestamp" />
+            <YAxis />
+            <Tooltip />
+            <Line type="monotone" dataKey="count" stroke="#8884d8" />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
 
-      <h2>Пользователи по дням</h2>
-      <ResponsiveContainer width="100%" height={300}>
-        <LineChart data={usersTimeseries}>
-          <XAxis dataKey="timestamp" />
-          <YAxis />
-          <Tooltip />
-          <Line type="monotone" dataKey="count" stroke="#82ca9d" />
-        </LineChart>
-      </ResponsiveContainer>
+      <div className={styles.chartSection}>
+        <h2 className={styles.chartTitle}>События</h2>
+        <table className={styles.table}>
+          <thead>
+          <tr>
+            <th>Название</th>
+            <th>Количество</th>
+            <th></th>
+          </tr>
+          </thead>
+          <tbody>
+          {eventNames.map(event => (
+            <>
+              <tr key={event.eventName}>
+                <td>{event.eventName}</td>
+                <td>{event.count}</td>
+                <td>
+                  <button
+                    className={styles.buttonSmall}
+                    onClick={() => handleEventClick(event.eventName)}
+                  >
+                    {selectedEvent === event.eventName ? 'Скрыть' : 'График'}
+                  </button>
+                </td>
+              </tr>
+
+              {selectedEvent === event.eventName && (
+                <tr key={`${event.eventName}-chart`}>
+                  <td colSpan={3}>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <LineChart data={selectedEventTimeseries}>
+                        <XAxis dataKey="timestamp" />
+                        <YAxis />
+                        <Tooltip />
+                        <Line type="monotone" dataKey="count" stroke="#8884d8" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </td>
+                </tr>
+              )}
+            </>
+          ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className={styles.chartSection}>
+        <h2 className={styles.chartTitle}>Пользователи по дням</h2>
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={usersTimeseries}>
+            <XAxis dataKey="timestamp" />
+            <YAxis />
+            <Tooltip />
+            <Line type="monotone" dataKey="count" stroke="#82ca9d" />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
     </div>
   )
 }

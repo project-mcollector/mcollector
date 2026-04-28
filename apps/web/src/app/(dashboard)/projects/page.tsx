@@ -1,74 +1,76 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import styles from '../dashboard.module.css'
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import styles from "../dashboard.module.css";
 
 type Project = {
-  id: string
-  name: string
-}
+  id: string;
+  name: string;
+};
 
 type CreatedProject = {
-  id: string
-  name: string
-  apiKey: string
-}
+  id: string;
+  name: string;
+  apiKey: string;
+};
 
-const BASE_URL = 'http://localhost:PORT'
+const BASE_URL =
+  process.env.NEXT_PUBLIC_IDENTITY_URL || "http://localhost:5003";
 
 export default function ProjectsPage() {
-  const router = useRouter()
-  const [projects, setProjects] = useState<Project[]>([])
-  const [newProjectName, setNewProjectName] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [createdProject, setCreatedProject] = useState<CreatedProject | null>(null)
+  const router = useRouter();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [createdProject, setCreatedProject] = useState<CreatedProject | null>(
+    null,
+  );
 
   useEffect(() => {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem("token");
     if (!token) {
-      router.push('/login')
-      return
+      router.push("/login");
+      return;
     }
 
     fetch(`${BASE_URL}/api/projects`, {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     })
-      .then(res => res.json())
-      .then(data => {
-        setProjects(data)
-        setLoading(false)
-      })
-  }, [router])
+      .then((res) => res.json())
+      .then((data) => {
+        setProjects(data);
+        setLoading(false);
+      });
+  }, [router]);
 
   async function createProject() {
-    if (!newProjectName.trim()) return
-    const token = localStorage.getItem('token')
+    if (!newProjectName.trim()) return;
+    const token = localStorage.getItem("token");
 
     const res = await fetch(`${BASE_URL}/api/projects`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ name: newProjectName })
-    })
+      body: JSON.stringify({ name: newProjectName }),
+    });
 
-    const created = await res.json()
-    setProjects([...projects, created])
-    setNewProjectName('')
-    setCreatedProject(created)
+    const created = await res.json();
+    setProjects([...projects, created]);
+    setNewProjectName("");
+    setCreatedProject(created);
   }
 
   function closeModal() {
-    setCreatedProject(null)
+    setCreatedProject(null);
   }
 
-  if (loading) return <p>Загрузка...</p>
+  if (loading) return <p>Загрузка...</p>;
 
   return (
     <div className={styles.page}>
-
       <div className={styles.header}>
         <h1 className={styles.title}>Мои проекты</h1>
       </div>
@@ -78,7 +80,7 @@ export default function ProjectsPage() {
       )}
 
       <div className={styles.projectsGrid}>
-        {projects.map(project => (
+        {projects.map((project) => (
           <div key={project.id} className={styles.projectCard}>
             <span className={styles.projectName}>{project.name}</span>
             <button
@@ -98,7 +100,7 @@ export default function ProjectsPage() {
             type="text"
             placeholder="Название проекта"
             value={newProjectName}
-            onChange={e => setNewProjectName(e.target.value)}
+            onChange={(e) => setNewProjectName(e.target.value)}
             className={styles.input}
           />
           <button onClick={createProject} className={styles.button}>
@@ -120,7 +122,9 @@ export default function ProjectsPage() {
               <span className={styles.apiKeyText}>{createdProject.apiKey}</span>
               <button
                 className={styles.buttonSmall}
-                onClick={() => navigator.clipboard.writeText(createdProject.apiKey)}
+                onClick={() =>
+                  navigator.clipboard.writeText(createdProject.apiKey)
+                }
               >
                 Скопировать
               </button>
@@ -134,7 +138,9 @@ export default function ProjectsPage() {
             <div className={styles.modalButtons}>
               <button
                 className={styles.button}
-                onClick={() => router.push(`/projects/${createdProject.id}/dashboard`)}
+                onClick={() =>
+                  router.push(`/projects/${createdProject.id}/dashboard`)
+                }
               >
                 Перейти в дашборд
               </button>
@@ -146,5 +152,5 @@ export default function ProjectsPage() {
         </div>
       )}
     </div>
-  )
+  );
 }

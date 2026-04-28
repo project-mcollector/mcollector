@@ -1,72 +1,71 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import styles from '../login.module.css'
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import styles from "../login.module.css";
 
-const BASE_URL = 'http://localhost:5003'
+const BASE_URL =
+  process.env.NEXT_PUBLIC_IDENTITY_URL || "http://localhost:5003";
 export default function RegisterPage() {
-  const router = useRouter()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [organizationName, setOrganizationName] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [organizationName, setOrganizationName] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError('')
+    e.preventDefault();
+    setError("");
 
     if (password !== confirmPassword) {
-      setError('Пароли не совпадают')
-      return
+      setError("Пароли не совпадают");
+      return;
     }
 
     if (password.length < 8) {
-      setError('Пароль должен быть не менее 8 символов')
-      return
+      setError("Пароль должен быть не менее 8 символов");
+      return;
     }
 
-    setLoading(true)
+    setLoading(true);
 
     try {
       const res = await fetch(`${BASE_URL}/api/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email,
           password,
-          organizationName
-        })
-      })
+          organizationName,
+        }),
+      });
 
-      const data = await res.json()
+      const data = await res.json();
 
       if (!res.ok) {
-        setError(data.message || 'Ошибка регистрации')
-        return
+        setError(data.message || "Ошибка регистрации");
+        return;
       }
 
-      localStorage.setItem('token', data.token)
-      router.push('/projects')
+      localStorage.setItem("token", data.token);
+      router.push("/projects");
     } catch (err) {
-      setError('Ошибка соединения с сервером')
+      setError("Ошибка соединения с сервером");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   return (
     <div className={styles.page}>
       <div className={styles.card}>
-
         <h1 className={styles.title}>MCollector</h1>
         <p className={styles.subtitle}>Создайте аккаунт</p>
 
         <form onSubmit={handleSubmit} className={styles.form}>
-
           {error && <div className={styles.error}>{error}</div>}
 
           <div>
@@ -75,7 +74,7 @@ export default function RegisterPage() {
               type="email"
               placeholder="you@example.com"
               value={email}
-              onChange={e => setEmail(e.target.value)}
+              onChange={(e) => setEmail(e.target.value)}
               required
               className={styles.input}
             />
@@ -87,7 +86,7 @@ export default function RegisterPage() {
               type="text"
               placeholder="Моя компания"
               value={organizationName}
-              onChange={e => setOrganizationName(e.target.value)}
+              onChange={(e) => setOrganizationName(e.target.value)}
               required
               className={styles.input}
             />
@@ -99,7 +98,7 @@ export default function RegisterPage() {
               type="password"
               placeholder="••••••••"
               value={password}
-              onChange={e => setPassword(e.target.value)}
+              onChange={(e) => setPassword(e.target.value)}
               required
               minLength={8}
               className={styles.input}
@@ -112,30 +111,24 @@ export default function RegisterPage() {
               type="password"
               placeholder="••••••••"
               value={confirmPassword}
-              onChange={e => setConfirmPassword(e.target.value)}
+              onChange={(e) => setConfirmPassword(e.target.value)}
               required
               className={styles.input}
             />
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className={styles.button}
-          >
-            {loading ? 'Регистрация...' : 'Зарегистрироваться'}
+          <button type="submit" disabled={loading} className={styles.button}>
+            {loading ? "Регистрация..." : "Зарегистрироваться"}
           </button>
-
         </form>
 
         <p className={styles.linkText}>
-          Уже есть аккаунт?{' '}
+          Уже есть аккаунт?{" "}
           <Link href="/login" className={styles.link}>
             Войти
           </Link>
         </p>
-
       </div>
     </div>
-  )
+  );
 }

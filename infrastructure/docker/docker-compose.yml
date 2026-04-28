@@ -125,4 +125,7 @@ services:
       - analytics
       - identity
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:5001
+      - NEXT_PUBLIC_API_URL=http://ingestion:8080
+      - NEXT_PUBLIC_IDENTITY_URL=http://identity:8080
+      - NEXT_PUBLIC_ANALYTICS_URL=http://analytics:8080
+      - NEXT_PUBLIC_INGESTION_URL=http://ingestion:8080

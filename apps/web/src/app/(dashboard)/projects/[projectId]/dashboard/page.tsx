@@ -1,118 +1,130 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import {
   LineChart,
   Line,
   XAxis,
   YAxis,
   Tooltip,
-  ResponsiveContainer
-} from 'recharts'
-import styles from '../../dashboard.module.css'
+  ResponsiveContainer,
+} from "recharts";
+import styles from "../../../dashboard.module.css";
 
-const BASE_URL = 'http://localhost:5000'
+const BASE_URL =
+  process.env.NEXT_PUBLIC_ANALYTICS_URL || "http://localhost:5002";
 
 function getDateRange() {
-  const now = Date.now()
+  const now = Date.now();
   return {
     to: new Date(now).toISOString(),
-    from: new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString()
-  }
+    from: new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString(),
+  };
 }
 
 type Overview = {
-  totalEvents: number
-  uniqueUsers: number
-  pageViews: number
-}
+  totalEvents: number;
+  uniqueUsers: number;
+  pageViews: number;
+};
 
 type TimeseriesPoint = {
-  timestamp: string
-  count: number
-}
+  timestamp: string;
+  count: number;
+};
 
 type EventName = {
-  eventName: string
-  count: number
-}
+  eventName: string;
+  count: number;
+};
 
 export default function DashboardPage() {
-  const router = useRouter()
-  const { projectId } = useParams()
+  const router = useRouter();
+  const { projectId } = useParams();
 
-  const [overview, setOverview] = useState<Overview | null>(null)
-  const [eventsTimeseries, setEventsTimeseries] = useState<TimeseriesPoint[]>([])
-  const [usersTimeseries, setUsersTimeseries] = useState<TimeseriesPoint[]>([])
-  const [eventNames, setEventNames] = useState<EventName[]>([])
-  const [selectedEvent, setSelectedEvent] = useState<string | null>(null)
-  const [selectedEventTimeseries, setSelectedEventTimeseries] = useState<TimeseriesPoint[]>([])
-  const [loading, setLoading] = useState(true)
+  const [overview, setOverview] = useState<Overview | null>(null);
+  const [eventsTimeseries, setEventsTimeseries] = useState<TimeseriesPoint[]>(
+    [],
+  );
+  const [usersTimeseries, setUsersTimeseries] = useState<TimeseriesPoint[]>([]);
+  const [eventNames, setEventNames] = useState<EventName[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
+  const [selectedEventTimeseries, setSelectedEventTimeseries] = useState<
+    TimeseriesPoint[]
+  >([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem("token");
     if (!token) {
-      router.push('/login')
-      return
+      router.push("/login");
+      return;
     }
 
-    const { to, from } = getDateRange()
-    const headers = { Authorization: `Bearer ${token}` }
-    const base = `${BASE_URL}/api/v1/projects/${projectId}/analytics`
+    const { to, from } = getDateRange();
+    const headers = { Authorization: `Bearer ${token}` };
+    const base = `${BASE_URL}/api/v1/projects/${projectId}/analytics`;
 
     Promise.all([
-      fetch(`${base}/overview?from=${from}&to=${to}`, { headers }).then(r => r.json()),
-      fetch(`${base}/events/timeseries?from=${from}&to=${to}&interval=day`, { headers }).then(r => r.json()),
-      fetch(`${base}/users/timeseries?from=${from}&to=${to}&interval=day`, { headers }).then(r => r.json()),
-      fetch(`${base}/events?projectId=${projectId}`, { headers }).then(r => r.json()),
+      fetch(`${base}/overview?from=${from}&to=${to}`, { headers }).then((r) =>
+        r.json(),
+      ),
+      fetch(`${base}/events/timeseries?from=${from}&to=${to}&interval=day`, {
+        headers,
+      }).then((r) => r.json()),
+      fetch(`${base}/users/timeseries?from=${from}&to=${to}&interval=day`, {
+        headers,
+      }).then((r) => r.json()),
+      fetch(`${base}/events?projectId=${projectId}`, { headers }).then((r) =>
+        r.json(),
+      ),
     ]).then(([overviewData, eventsData, usersData, eventNamesData]) => {
-      setOverview(overviewData)
-      setEventsTimeseries(eventsData)
-      setUsersTimeseries(usersData)
-      setEventNames(eventNamesData)
-      setLoading(false)
-    })
-  }, [projectId, router])
+      setOverview(overviewData);
+      setEventsTimeseries(eventsData);
+      setUsersTimeseries(usersData);
+      setEventNames(eventNamesData);
+      setLoading(false);
+    });
+  }, [projectId, router]);
 
   function handleEventClick(eventName: string) {
-    const token = localStorage.getItem('token')
-    if (!token) return
+    const token = localStorage.getItem("token");
+    if (!token) return;
 
     if (selectedEvent === eventName) {
-      setSelectedEvent(null)
-      setSelectedEventTimeseries([])
-      return
+      setSelectedEvent(null);
+      setSelectedEventTimeseries([]);
+      return;
     }
 
-    const { to, from } = getDateRange()
-    const headers = { Authorization: `Bearer ${token}` }
-    const base = `${BASE_URL}/api/v1/projects/${projectId}/analytics`
+    const { to, from } = getDateRange();
+    const headers = { Authorization: `Bearer ${token}` };
+    const base = `${BASE_URL}/api/v1/projects/${projectId}/analytics`;
 
     fetch(
       `${base}/events/timeseries?from=${from}&to=${to}&interval=day&eventName=${eventName}`,
-      { headers }
+      { headers },
     )
-      .then(r => r.json())
-      .then(data => {
-        setSelectedEvent(eventName)
-        setSelectedEventTimeseries(data)
-      })
+      .then((r) => r.json())
+      .then((data) => {
+        setSelectedEvent(eventName);
+        setSelectedEventTimeseries(data);
+      });
   }
 
-  if (loading) return <p className={styles.emptyState}>Загрузка...</p>
-  if (!overview) return <p className={styles.emptyState}>Нет данных</p>
+  if (loading) return <p className={styles.emptyState}>Загрузка...</p>;
+  if (!overview) return <p className={styles.emptyState}>Нет данных</p>;
 
   return (
     <div className={styles.page}>
-
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Дашборд</h1>
         </div>
         <button
           className={styles.buttonOutline}
-          onClick={() => router.push('/projects')}
+          onClick={() => router.push("/projects")}
         >
           ← Мои проекты
         </button>
@@ -149,44 +161,48 @@ export default function DashboardPage() {
         <h2 className={styles.chartTitle}>События</h2>
         <table className={styles.table}>
           <thead>
-          <tr>
-            <th>Название</th>
-            <th>Количество</th>
-            <th></th>
-          </tr>
+            <tr>
+              <th>Название</th>
+              <th>Количество</th>
+              <th></th>
+            </tr>
           </thead>
           <tbody>
-          {eventNames.map(event => (
-            <>
-              <tr key={event.eventName}>
-                <td>{event.eventName}</td>
-                <td>{event.count}</td>
-                <td>
-                  <button
-                    className={styles.buttonSmall}
-                    onClick={() => handleEventClick(event.eventName)}
-                  >
-                    {selectedEvent === event.eventName ? 'Скрыть' : 'График'}
-                  </button>
-                </td>
-              </tr>
-
-              {selectedEvent === event.eventName && (
-                <tr key={`${event.eventName}-chart`}>
-                  <td colSpan={3}>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <LineChart data={selectedEventTimeseries}>
-                        <XAxis dataKey="timestamp" />
-                        <YAxis />
-                        <Tooltip />
-                        <Line type="monotone" dataKey="count" stroke="#8884d8" />
-                      </LineChart>
-                    </ResponsiveContainer>
+            {eventNames.map((event) => (
+              <>
+                <tr key={event.eventName}>
+                  <td>{event.eventName}</td>
+                  <td>{event.count}</td>
+                  <td>
+                    <button
+                      className={styles.buttonSmall}
+                      onClick={() => handleEventClick(event.eventName)}
+                    >
+                      {selectedEvent === event.eventName ? "Скрыть" : "График"}
+                    </button>
                   </td>
                 </tr>
-              )}
-            </>
-          ))}
+
+                {selectedEvent === event.eventName && (
+                  <tr key={`${event.eventName}-chart`}>
+                    <td colSpan={3}>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <LineChart data={selectedEventTimeseries}>
+                          <XAxis dataKey="timestamp" />
+                          <YAxis />
+                          <Tooltip />
+                          <Line
+                            type="monotone"
+                            dataKey="count"
+                            stroke="#8884d8"
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </td>
+                  </tr>
+                )}
+              </>
+            ))}
           </tbody>
         </table>
       </div>
@@ -202,7 +218,6 @@ export default function DashboardPage() {
           </LineChart>
         </ResponsiveContainer>
       </div>
-
     </div>
-  )
+  );
 }

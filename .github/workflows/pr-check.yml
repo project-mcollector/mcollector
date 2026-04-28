@@ -42,6 +42,14 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
+      - name: Ensure npm lockfiles are not committed
+        run: |
+          if git ls-files '**/package-lock.json' | grep -q .; then
+            echo "Found package-lock.json files in pnpm-managed repo:" >&2
+            git ls-files '**/package-lock.json' >&2
+            exit 1
+          fi
+
       - name: Install dependencies
         run: pnpm install
 

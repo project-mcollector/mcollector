@@ -1,8 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
-using Contracts.Messages;
-using Ingestion.Api.Services;
 using Infrastructure.Messaging;
+using Infrastructure.Auth;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Moq;
@@ -12,11 +11,14 @@ namespace Ingestion.Api.Tests;
 public class IngestionControllerIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly WebApplicationFactory<Program> _factory;
-    private readonly Mock<IEventPublisher> _mockPublisher;
 
     public IngestionControllerIntegrationTests(WebApplicationFactory<Program> factory)
     {
-        _mockPublisher = new Mock<IEventPublisher>();
+        Mock<IEventPublisher> mockPublisher = new();
+        Mock<IApiKeyValidator> mockApiKeyValidator = new();
+
+        mockApiKeyValidator.Setup(v => v.ValidateApiKeyAsync(It.IsAny<Guid>(), It.IsAny<string>()))
+                            .ReturnsAsync(true);
 
         _factory = factory.WithWebHostBuilder(builder =>
         {
@@ -27,7 +29,14 @@ public class IngestionControllerIntegrationTests : IClassFixture<WebApplicationF
                 if (descriptor != null)
                     services.Remove(descriptor);
 
-                services.AddScoped<IEventPublisher>(_ => _mockPublisher.Object);
+                services.AddScoped<IEventPublisher>(_ => mockPublisher.Object);
+
+                var authDescriptor = services.SingleOrDefault(d =>
+                    d.ServiceType == typeof(IApiKeyValidator));
+                if (authDescriptor != null)
+                    services.Remove(authDescriptor);
+
+                services.AddScoped<IApiKeyValidator>(_ => mockApiKeyValidator.Object);
             });
         });
     }
@@ -52,7 +61,7 @@ public class IngestionControllerIntegrationTests : IClassFixture<WebApplicationF
     }
 
     [Fact]
-    public async Task PostEvent_MissingProjectId_Returns400()
+    public async Task PostEvent_MissingProjectId_Returns401()
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add("X-Api-Key", "test-api-key");
@@ -66,11 +75,11 @@ public class IngestionControllerIntegrationTests : IClassFixture<WebApplicationF
 
         var response = await client.PostAsJsonAsync("/api/v1/ingest/event", request);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
-    public async Task PostEvent_MissingApiKey_Returns400()
+    public async Task PostEvent_MissingApiKey_Returns401()
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add("X-Project-Id", Guid.NewGuid().ToString());
@@ -84,7 +93,7 @@ public class IngestionControllerIntegrationTests : IClassFixture<WebApplicationF
 
         var response = await client.PostAsJsonAsync("/api/v1/ingest/event", request);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]

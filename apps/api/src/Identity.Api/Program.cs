@@ -1,3 +1,4 @@
+using Identity.Api.Application.Services;
 using Identity.Api.Infrastructure.Identity;
 using Identity.Api.Infrastructure.Persistence;
 using Infrastructure.Auth;
@@ -44,6 +45,8 @@ builder.Services.AddDbContext<IdentityAppDbContext>(options =>
 
 builder.Services.AddIdentityApiEndpoints<ApplicationUser>()
     .AddEntityFrameworkStores<IdentityAppDbContext>();
+
+builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
 
 builder.Services.AddControllers();
 

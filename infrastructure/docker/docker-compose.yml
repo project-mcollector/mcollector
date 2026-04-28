@@ -32,10 +32,29 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
     healthcheck:
-      test: ["CMD-SHELL", "kafka-cluster.sh cluster-id --bootstrap-server localhost:9092 || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092",
+        ]
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  kafka-init:
+    image: apache/kafka:latest
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092
+      --create --if-not-exists
+      --topic raw-events
+      --partitions 3
+      --replication-factor 1 && echo 'Topic raw-events created'"
+    restart: "no"
 
   ingestion:
     build:
@@ -46,8 +65,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      kafka:
-        condition: service_started
+      kafka-init:
+        condition: service_completed_successfully
     environment:
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=mcollector;Username=app;Password=app
       - Kafka__BootstrapServers=kafka:29092
@@ -61,8 +80,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      kafka:
-        condition: service_started
+      kafka-init:
+        condition: service_completed_successfully
     environment:
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=mcollector;Username=app;Password=app
       - Kafka__BootstrapServers=kafka:29092
@@ -76,8 +95,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      kafka:
-        condition: service_started
+      kafka-init:
+        condition: service_completed_successfully
     environment:
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=mcollector;Username=app;Password=app
       - Kafka__BootstrapServers=kafka:29092
@@ -89,8 +108,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      kafka:
-        condition: service_started
+      kafka-init:
+        condition: service_completed_successfully
     environment:
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=mcollector;Username=app;Password=app
       - Kafka__BootstrapServers=kafka:29092

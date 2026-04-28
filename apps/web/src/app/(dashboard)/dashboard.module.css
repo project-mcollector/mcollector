@@ -1,0 +1,315 @@
+.page {
+    min-height: 100vh;
+    background-color: #fafafa;
+    padding: 40px;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+}
+
+.title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #18181b;
+    letter-spacing: -0.5px;
+    margin: 0;
+}
+
+.subtitle {
+    font-size: 14px;
+    color: #71717a;
+    margin-top: 4px;
+}
+
+/* Кнопки */
+.button {
+    background-color: #18181b;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.button:hover {
+    background-color: #3f3f46;
+}
+
+.buttonOutline {
+    background-color: white;
+    color: #18181b;
+    border: 1px solid #e4e4e7;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.buttonOutline:hover {
+    background-color: #f4f4f5;
+}
+
+.buttonSmall {
+    background-color: #18181b;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.buttonSmall:hover {
+    background-color: #3f3f46;
+}
+
+/* Поле ввода */
+.input {
+    width: 100%;
+    border: 1px solid #d4d4d8;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 14px;
+    color: #18181b;
+    outline: none;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+    background: white;
+}
+
+.input:focus {
+    border-color: #18181b;
+}
+
+.input::placeholder {
+    color: #a1a1aa;
+}
+
+.label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #3f3f46;
+    margin-bottom: 6px;
+    display: block;
+}
+
+/* Карточки проектов */
+.projectsGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 40px;
+}
+
+.projectCard {
+    background: white;
+    border: 1px solid #e4e4e7;
+    border-radius: 12px;
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: box-shadow 0.2s;
+}
+
+.projectCard:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.projectName {
+    font-size: 15px;
+    font-weight: 500;
+    color: #18181b;
+}
+
+/* Блок создания проекта */
+.createSection {
+    background: white;
+    border: 1px solid #e4e4e7;
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 480px;
+}
+
+.createTitle {
+    font-size: 16px;
+    font-weight: 600;
+    color: #18181b;
+    margin: 0 0 16px 0;
+}
+
+.createRow {
+    display: flex;
+    gap: 12px;
+}
+
+.emptyState {
+    color: #71717a;
+    font-size: 14px;
+    margin-bottom: 24px;
+}
+
+/* Статистические карточки для дашборда */
+.statsGrid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+}
+
+.statCard {
+    background: white;
+    border: 1px solid #e4e4e7;
+    border-radius: 12px;
+    padding: 20px 24px;
+}
+
+.statLabel {
+    font-size: 13px;
+    color: #71717a;
+    margin: 0 0 8px 0;
+}
+
+.statValue {
+    font-size: 28px;
+    font-weight: 700;
+    color: #18181b;
+    margin: 0;
+}
+
+/* Графики */
+.chartSection {
+    background: white;
+    border: 1px solid #e4e4e7;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.chartTitle {
+    font-size: 16px;
+    font-weight: 600;
+    color: #18181b;
+    margin: 0 0 20px 0;
+}
+
+/* Таблица событий */
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.table th {
+    text-align: left;
+    padding: 10px 16px;
+    color: #71717a;
+    font-weight: 500;
+    border-bottom: 1px solid #e4e4e7;
+}
+
+.table td {
+    padding: 12px 16px;
+    color: #18181b;
+    border-bottom: 1px solid #f4f4f5;
+}
+
+.table tr:last-child td {
+    border-bottom: none;
+}
+
+/* Модалка */
+.modalOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.modal {
+    background: white;
+    border-radius: 16px;
+    padding: 32px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+
+.modalTitle {
+    font-size: 20px;
+    font-weight: 700;
+    color: #18181b;
+    margin: 0 0 8px 0;
+}
+
+.modalSubtitle {
+    font-size: 14px;
+    color: #71717a;
+    margin: 0 0 24px 0;
+}
+
+.apiKeyBox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #f4f4f5;
+    border: 1px solid #e4e4e7;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+}
+
+.apiKeyText {
+    font-family: monospace;
+    font-size: 13px;
+    color: #18181b;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.codeBlock {
+    background: #18181b;
+    color: #e4e4e7;
+    border-radius: 8px;
+    padding: 16px;
+    font-family: monospace;
+    font-size: 13px;
+    margin-bottom: 24px;
+    white-space: pre;
+    overflow-x: auto;
+}
+
+.modalButtons {
+    display: flex;
+    gap: 12px;
+}
+
+/* Навигация */
+.backLink {
+    font-size: 14px;
+    color: #71717a;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.backLink:hover {
+    color: #18181b;
+}

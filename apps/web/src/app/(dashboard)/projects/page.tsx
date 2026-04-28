@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import styles from '../dashboard.module.css'
 
 type Project = {
   id: string
@@ -40,7 +41,6 @@ export default function ProjectsPage() {
       })
   }, [router])
 
-
   async function createProject() {
     if (!newProjectName.trim()) return
     const token = localStorage.getItem('token')
@@ -67,53 +67,81 @@ export default function ProjectsPage() {
   if (loading) return <p>Загрузка...</p>
 
   return (
-    <div>
-      <h1>Мои проекты</h1>
+    <div className={styles.page}>
 
-      {projects.length === 0 && <p>У вас пока нет проектов</p>}
+      <div className={styles.header}>
+        <h1 className={styles.title}>Мои проекты</h1>
+      </div>
 
-      {projects.map(project => (
-        <div key={project.id}>
-          <span>{project.name}</span>
-          <button onClick={() => router.push(`/projects/${project.id}/dashboard`)}>
-            Открыть
+      {projects.length === 0 && (
+        <p className={styles.emptyState}>У вас пока нет проектов</p>
+      )}
+
+      <div className={styles.projectsGrid}>
+        {projects.map(project => (
+          <div key={project.id} className={styles.projectCard}>
+            <span className={styles.projectName}>{project.name}</span>
+            <button
+              className={styles.buttonSmall}
+              onClick={() => router.push(`/projects/${project.id}/dashboard`)}
+            >
+              Открыть
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className={styles.createSection}>
+        <p className={styles.createTitle}>Создать новый проект</p>
+        <div className={styles.createRow}>
+          <input
+            type="text"
+            placeholder="Название проекта"
+            value={newProjectName}
+            onChange={e => setNewProjectName(e.target.value)}
+            className={styles.input}
+          />
+          <button onClick={createProject} className={styles.button}>
+            Создать
           </button>
         </div>
-      ))}
-
-      <h2>Создать новый проект</h2>
-      <input
-        type="text"
-        placeholder="Название проекта"
-        value={newProjectName}
-        onChange={e => setNewProjectName(e.target.value)}
-      />
-      <button onClick={createProject}>Создать</button>
+      </div>
 
       {createdProject && (
-        <div>
-          <div>
-            <h2>Проект создан!</h2>
+        <div className={styles.modalOverlay}>
+          <div className={styles.modal}>
+            <h2 className={styles.modalTitle}>Проект создан!</h2>
+            <p className={styles.modalSubtitle}>
+              Установите SDK на ваш сайт чтобы начать собирать данные
+            </p>
 
-            <p>Ваш API-ключ:</p>
-            <code>{createdProject.apiKey}</code>
-            <button onClick={() => navigator.clipboard.writeText(createdProject.apiKey)}>
-              Скопировать
-            </button>
+            <label className={styles.label}>Ваш API-ключ</label>
+            <div className={styles.apiKeyBox}>
+              <span className={styles.apiKeyText}>{createdProject.apiKey}</span>
+              <button
+                className={styles.buttonSmall}
+                onClick={() => navigator.clipboard.writeText(createdProject.apiKey)}
+              >
+                Скопировать
+              </button>
+            </div>
 
-            <p>Добавьте этот код на ваш сайт:</p>
-            <pre>
-              {`<script>
-  analytics.init('${createdProject.apiKey}')
-</script>`}
-            </pre>
+            <label className={styles.label}>Добавьте на ваш сайт</label>
+            <div className={styles.codeBlock}>
+              {`<script>\n  analytics.init('${createdProject.apiKey}')\n</script>`}
+            </div>
 
-            <button onClick={() => router.push(`/projects/${createdProject.id}/dashboard`)}>
-              Перейти в дашборд
-            </button>
-            <button onClick={closeModal}>
-              Закрыть
-            </button>
+            <div className={styles.modalButtons}>
+              <button
+                className={styles.button}
+                onClick={() => router.push(`/projects/${createdProject.id}/dashboard`)}
+              >
+                Перейти в дашборд
+              </button>
+              <button className={styles.buttonOutline} onClick={closeModal}>
+                Закрыть
+              </button>
+            </div>
           </div>
         </div>
       )}

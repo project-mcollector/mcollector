@@ -52,9 +52,14 @@ public class ApiKeyValidator : IApiKeyValidator
         if (projectId == Guid.Empty || string.IsNullOrWhiteSpace(apiKey))
             return false;
 
+        // Получаем секрет из конфига (или внедряем через DI)
+        var configuration = _context.GetService<IConfiguration>();
+        var hmacSecret = configuration["ApiKey:HmacSecret"];
+        var apiKeyHash = Identity.Api.Application.Services.ApiKeyService.ComputeApiKeyHashStatic(apiKey, hmacSecret);
+
         return await _context.Projects
             .AsNoTracking()
-            .AnyAsync(p => p.Id == projectId && p.ApiKey == apiKey);
+            .AnyAsync(p => p.Id == projectId && p.ApiKey == apiKeyHash);
     }
 
     public async Task<Guid?> GetProjectIdByApiKeyAsync(string apiKey, CancellationToken cancellationToken = default)

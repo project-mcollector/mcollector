@@ -46,11 +46,14 @@ public class ProjectsController(UserManager<ApplicationUser> userManager, Identi
 
         var dbUser = await dbContext.Users.FindAsync(user.Id);
 
+        var apiKey = apiKeyService.GenerateApiKey();
+        var apiKeyHash = apiKeyService.ComputeApiKeyHash(apiKey);
+
         var project = new Project
         {
             Name = request.Name,
             Description = request.Description ?? string.Empty,
-            ApiKey = apiKeyService.GenerateApiKey()
+            ApiKey = apiKeyHash
         };
 
         project.Users.Add(dbUser ?? throw new InvalidOperationException("User not found"));
@@ -58,7 +61,7 @@ public class ProjectsController(UserManager<ApplicationUser> userManager, Identi
 
         await dbContext.SaveChangesAsync();
 
-        return Ok(new ProjectResponse { Id = project.Id, Name = project.Name, Description = project.Description, ApiKey = project.ApiKey });
+        return Ok(new ProjectResponse { Id = project.Id, Name = project.Name, Description = project.Description, ApiKey = apiKey });
     }
 
     [HttpGet("{id:guid}")]
@@ -112,7 +115,9 @@ public class ProjectsController(UserManager<ApplicationUser> userManager, Identi
     public Task<IActionResult> RegenerateApiKey(Guid id)
         => ExecuteWithProjectAsync(id, async project =>
         {
-            project.ApiKey = apiKeyService.GenerateApiKey();
+            var apiKey = apiKeyService.GenerateApiKey();
+            var apiKeyHash = apiKeyService.ComputeApiKeyHash(apiKey);
+            project.ApiKey = apiKeyHash;
             await dbContext.SaveChangesAsync();
 
             return Ok(new ProjectResponse
@@ -120,7 +125,7 @@ public class ProjectsController(UserManager<ApplicationUser> userManager, Identi
                 Id = project.Id,
                 Name = project.Name,
                 Description = project.Description,
-                ApiKey = project.ApiKey
+                ApiKey = apiKey
             });
         });
 

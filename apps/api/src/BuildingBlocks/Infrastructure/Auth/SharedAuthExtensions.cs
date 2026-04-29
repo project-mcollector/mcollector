@@ -13,6 +13,12 @@ public static class SharedAuthExtensions
     {
         var jwtSecret = configuration["Jwt:Secret"]
             ?? throw new InvalidOperationException("Jwt:Secret is not configured");
+
+        var validIssuer = configuration["Jwt:Issuer"]
+            ?? throw new InvalidOperationException("Jwt:Issuer is not configured");
+        var validAudience = configuration["Jwt:Audience"]
+            ?? throw new InvalidOperationException("Jwt:Audience is not configured");
+
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
@@ -20,8 +26,10 @@ public static class SharedAuthExtensions
                 {
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
-                    ValidateIssuer = false,
-                    ValidateAudience = false,
+                    ValidateIssuer = true,
+                    ValidIssuer = validIssuer,
+                    ValidateAudience = true,
+                    ValidAudience = validAudience,
                     ClockSkew = TimeSpan.Zero
                 };
             });

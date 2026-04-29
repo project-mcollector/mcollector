@@ -1,0 +1,117 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  REGION: europe-north1
+  REGISTRY: europe-north1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/mcollector
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and push API images
+        run: |
+          TAG=${{ github.sha }}
+          R=${{ env.REGISTRY }}
+
+          declare -A services=(
+            [ingestion]="apps/api/src/Ingestion.Api/Dockerfile"
+            [analytics]="apps/api/src/Analytics.Api/Dockerfile"
+            [identity]="apps/api/src/Identity.Api/Dockerfile"
+            [processor]="apps/api/src/EventProcessor/Dockerfile"
+          )
+
+          for name in "${!services[@]}"; do
+            docker build \
+              -t "$R/$name:$TAG" \
+              -t "$R/$name:latest" \
+              -f "${services[$name]}" \
+              apps/api
+            docker push "$R/$name:$TAG"
+            docker push "$R/$name:latest"
+          done
+
+      - name: Build and push web image
+        run: |
+          TAG=${{ github.sha }}
+          docker build \
+            -t "${{ env.REGISTRY }}/web:$TAG" \
+            -t "${{ env.REGISTRY }}/web:latest" \
+            --build-arg NEXT_PUBLIC_IDENTITY_URL=${{ secrets.WEB_IDENTITY_URL }} \
+            --build-arg NEXT_PUBLIC_ANALYTICS_URL=${{ secrets.WEB_ANALYTICS_URL }} \
+            --build-arg NEXT_PUBLIC_INGESTION_URL=${{ secrets.WEB_INGESTION_URL }} \
+            -f apps/web/Dockerfile \
+            .
+          docker push "${{ env.REGISTRY }}/web:$TAG"
+          docker push "${{ env.REGISTRY }}/web:latest"
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Prepare VM directories
+        run: |
+          gcloud compute ssh ${{ secrets.VM_USER }}@mcollector-vm \
+            --zone=${{ secrets.VM_ZONE }} \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
+            --command="mkdir -p ~/mcollector/infrastructure/docker"
+
+      - name: Copy docker-compose to VM
+        run: |
+          gcloud compute scp infrastructure/docker/docker-compose.prod.yml \
+            ${{ secrets.VM_USER }}@mcollector-vm:~/mcollector/infrastructure/docker/docker-compose.prod.yml \
+            --zone=${{ secrets.VM_ZONE }} \
+            --project=${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Deploy
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          ALLOWED_ORIGIN: ${{ secrets.ALLOWED_ORIGIN }}
+        run: |
+          {
+            echo "REGISTRY=${{ env.REGISTRY }}"
+            echo "IMAGE_TAG=${{ github.sha }}"
+            echo "JWT_SECRET=${JWT_SECRET}"
+            echo "ALLOWED_ORIGIN=${ALLOWED_ORIGIN}"
+          } > /tmp/deploy.env
+
+          gcloud compute scp /tmp/deploy.env \
+            ${{ secrets.VM_USER }}@mcollector-vm:~/.deploy.env \
+            --zone=${{ secrets.VM_ZONE }} \
+            --project=${{ secrets.GCP_PROJECT_ID }}
+
+          gcloud compute ssh ${{ secrets.VM_USER }}@mcollector-vm \
+            --zone=${{ secrets.VM_ZONE }} \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
+            --command="
+              gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet &&
+              sudo mkdir -p /root/.docker &&
+              sudo cp ~/.docker/config.json /root/.docker/config.json &&
+              cd ~/mcollector &&
+              sudo docker compose -f infrastructure/docker/docker-compose.prod.yml --env-file ~/.deploy.env pull &&
+              sudo docker compose -f infrastructure/docker/docker-compose.prod.yml --env-file ~/.deploy.env up -d --remove-orphans &&
+              sudo docker image prune -f &&
+              rm -f ~/.deploy.env
+            "

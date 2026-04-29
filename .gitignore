@@ -48,3 +48,4 @@ coverage/
 # .NET
 *.user
 *.suo
+.claude/

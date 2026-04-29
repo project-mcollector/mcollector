@@ -29,12 +29,12 @@ public class AnalyticsControllerTests
         {
             new()
             {
-                EventId = Guid.NewGuid(), ProjectId = projectId, EventName = "page_view", UserId = "user1",
+                EventId = Guid.NewGuid(), ProjectId = projectId, EventName = "$pageview", UserId = "user1",
                 ProcessedAt = DateTimeOffset.UtcNow
             },
             new()
             {
-                EventId = Guid.NewGuid(), ProjectId = projectId, EventName = "page_view", UserId = "user1",
+                EventId = Guid.NewGuid(), ProjectId = projectId, EventName = "$pageview", UserId = "user1",
                 ProcessedAt = DateTimeOffset.UtcNow
             },
             new()
@@ -44,7 +44,7 @@ public class AnalyticsControllerTests
             },
             new()
             {
-                EventId = Guid.NewGuid(), ProjectId = Guid.NewGuid(), EventName = "page_view", UserId = "user3",
+                EventId = Guid.NewGuid(), ProjectId = Guid.NewGuid(), EventName = "$pageview", UserId = "user3",
                 ProcessedAt = DateTimeOffset.UtcNow
             }, // Different project
         });
@@ -78,12 +78,12 @@ public class AnalyticsControllerTests
         {
             new()
             {
-                EventId = Guid.NewGuid(), ProjectId = projectId, EventName = "page_view", UserId = "user1",
+                EventId = Guid.NewGuid(), ProjectId = projectId, EventName = "$pageview", UserId = "user1",
                 ProcessedAt = DateTimeOffset.UtcNow
             },
             new()
             {
-                EventId = Guid.NewGuid(), ProjectId = projectId, EventName = "page_view", UserId = "user1",
+                EventId = Guid.NewGuid(), ProjectId = projectId, EventName = "$pageview", UserId = "user1",
                 ProcessedAt = DateTimeOffset.UtcNow
             },
             new()
@@ -103,7 +103,7 @@ public class AnalyticsControllerTests
         Assert.NotNull(result);
         var events = Assert.IsType<List<string>>(result.Value);
         Assert.Equal(2, events.Count);
-        Assert.Contains("page_view", events);
+        Assert.Contains("$pageview", events);
         Assert.Contains("custom_event", events);
     }
 
@@ -118,12 +118,12 @@ public class AnalyticsControllerTests
         {
             new()
             {
-                EventId = Guid.NewGuid(), ProjectId = projectId, EventName = "page_view", UserId = "user1",
+                EventId = Guid.NewGuid(), ProjectId = projectId, EventName = "$pageview", UserId = "user1",
                 PropertiesJson = "{\"url\": \"/home\", \"referrer\": \"google\"}", ProcessedAt = DateTimeOffset.UtcNow
             },
             new()
             {
-                EventId = Guid.NewGuid(), ProjectId = projectId, EventName = "page_view", UserId = "user2",
+                EventId = Guid.NewGuid(), ProjectId = projectId, EventName = "$pageview", UserId = "user2",
                 PropertiesJson = "{\"url\": \"/about\", \"duration\": 10}", ProcessedAt = DateTimeOffset.UtcNow
             },
             new()
@@ -137,7 +137,7 @@ public class AnalyticsControllerTests
         var controller = new AnalyticsController(dbContext);
 
         // Act
-        var result = await controller.GetEventProperties(projectId, "page_view") as OkObjectResult;
+        var result = await controller.GetEventProperties(projectId, "$pageview") as OkObjectResult;
 
         // Assert
         Assert.NotNull(result);

@@ -7,28 +7,30 @@ using System.Text.Json;
 namespace Analytics.Api.API.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/v1/projects/{projectId:guid}/analytics")]
 [Authorize]
 public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
 {
     [HttpGet("overview")]
-    public async Task<IActionResult> GetOverview([FromQuery] Guid projectId, [FromQuery] DateTimeOffset? from,
+    public async Task<IActionResult> GetOverview(
+        Guid projectId,
+        [FromQuery] DateTimeOffset? from,
         [FromQuery] DateTimeOffset? to)
     {
         var query = dbContext.ProcessedEvents.AsNoTracking().Where(e => e.ProjectId == projectId);
 
-        if (from.HasValue) query = query.Where(e => e.ProcessedAt >= from.Value);
-        if (to.HasValue) query = query.Where(e => e.ProcessedAt <= to.Value);
+        if (from.HasValue) query = query.Where(e => e.Timestamp >= from.Value);
+        if (to.HasValue) query = query.Where(e => e.Timestamp <= to.Value);
 
         var totalEvents = await query.CountAsync();
         var uniqueUsers = await query.Select(e => e.UserId).Distinct().CountAsync();
-        var pageViews = await query.Where(e => e.EventName == "page_view").CountAsync();
+        var pageViews = await query.Where(e => e.EventName == "$pageview").CountAsync();
 
         return Ok(new { totalEvents, uniqueUsers, pageViews });
     }
 
     [HttpGet("events")]
-    public async Task<IActionResult> GetEvents([FromQuery] Guid projectId)
+    public async Task<IActionResult> GetEvents(Guid projectId)
     {
         var rawEvents = await dbContext.ProcessedEvents
             .AsNoTracking()
@@ -41,14 +43,14 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
     }
 
     [HttpGet("events/{eventName}/properties")]
-    public async Task<IActionResult> GetEventProperties([FromQuery] Guid projectId, string eventName)
+    public async Task<IActionResult> GetEventProperties(Guid projectId, string eventName)
     {
         const int sampleSize = 100;
 
         var jsonStrings = await dbContext.ProcessedEvents
             .AsNoTracking()
             .Where(e => e.ProjectId == projectId && e.EventName == eventName && e.PropertiesJson != null)
-            .OrderByDescending(e => e.ProcessedAt)
+            .OrderByDescending(e => e.Timestamp)
             .Select(e => e.PropertiesJson)
             .Take(sampleSize)
             .ToListAsync();
@@ -75,7 +77,7 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
 
     [HttpGet("events/timeseries")]
     public async Task<IActionResult> GetEventsTimeseries(
-        [FromQuery] Guid projectId,
+        Guid projectId,
         [FromQuery] DateTimeOffset from,
         [FromQuery] DateTimeOffset to,
         [FromQuery] string interval = "day",
@@ -83,7 +85,7 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
     {
         var query = dbContext.ProcessedEvents
             .AsNoTracking()
-            .Where(e => e.ProjectId == projectId && e.ProcessedAt >= from && e.ProcessedAt <= to);
+            .Where(e => e.ProjectId == projectId && e.Timestamp >= from && e.Timestamp <= to);
 
         if (!string.IsNullOrEmpty(eventName))
             query = query.Where(e => e.EventName == eventName);
@@ -97,7 +99,7 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
         };
 
         var timeseries = data
-            .GroupBy(e => groupSelector(e.ProcessedAt))
+            .GroupBy(e => groupSelector(e.Timestamp))
             .Select(g => new { timestamp = g.Key, count = g.Count() })
             .OrderBy(x => x.timestamp)
             .ToList();
@@ -107,15 +109,15 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
 
     [HttpGet("users/timeseries")]
     public async Task<IActionResult> GetUsersTimeseries(
-        [FromQuery] Guid projectId,
+        Guid projectId,
         [FromQuery] DateTimeOffset from,
         [FromQuery] DateTimeOffset to,
         [FromQuery] string interval = "day")
     {
-        var query = dbContext.ProcessedEvents.AsNoTracking()
-            .Where(e => e.ProjectId == projectId && e.ProcessedAt >= from && e.ProcessedAt <= to);
+        var data = await dbContext.ProcessedEvents.AsNoTracking()
+            .Where(e => e.ProjectId == projectId && e.Timestamp >= from && e.Timestamp <= to)
+            .ToListAsync();
 
-        var data = await query.ToListAsync(); // Client eval for MVP grouping
         Func<DateTimeOffset, DateTime> groupSelector = interval.ToLower() switch
         {
             "hour" => dt => new(dt.Year, dt.Month, dt.Day, dt.Hour, 0, 0),
@@ -124,7 +126,7 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
         };
 
         var timeseries = data
-            .GroupBy(e => groupSelector(e.ProcessedAt))
+            .GroupBy(e => groupSelector(e.Timestamp))
             .Select(g => new { timestamp = g.Key, count = g.Select(x => x.UserId).Distinct().Count() })
             .OrderBy(x => x.timestamp)
             .ToList();

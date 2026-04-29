@@ -1,6 +1,7 @@
 using Contracts.Messages;
 using Infrastructure.Messaging;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 using EventProcessor.Contracts;
 
 namespace EventProcessor;
@@ -47,7 +48,7 @@ public class EventProcessorService : IEventConsumer<RawEvent>
             Timestamp = message.ClientTimestamp != default ? message.ClientTimestamp : message.ServerTimestamp,
             UserId = message.UserId,
             SessionId = message.SessionId,
-            Properties = message.Properties,
+            PropertiesJson = message.Properties is null ? null : JsonSerializer.Serialize(message.Properties),
 
             // We are not parsing IP and UserAgent yet, so we leave them empty or null:
             EventCountry = null,

@@ -11,7 +11,8 @@ public static class SharedAuthExtensions
     public static IServiceCollection AddSharedAuthentication(this IServiceCollection services,
         IConfiguration configuration)
     {
-        var jwtSecret = configuration["Jwt:Secret"] ?? "super-secret-default-key-for-dev-mcollector";
+        var jwtSecret = configuration["Jwt:Secret"]
+            ?? throw new InvalidOperationException("Jwt:Secret is not configured");
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {

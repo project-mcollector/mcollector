@@ -47,18 +47,25 @@ public class ApiKeyValidator : IApiKeyValidator
         _context = context;
     }
 
-    /// <summary>
-    /// Validates that an API key belongs to a specific project
-    /// </summary>
     public async Task<bool> ValidateApiKeyAsync(Guid projectId, string apiKey)
     {
         if (projectId == Guid.Empty || string.IsNullOrWhiteSpace(apiKey))
             return false;
 
+        return await _context.Projects
+            .AsNoTracking()
+            .AnyAsync(p => p.Id == projectId && p.ApiKey == apiKey);
+    }
+
+    public async Task<Guid?> GetProjectIdByApiKeyAsync(string apiKey, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(apiKey)) return null;
+
         var project = await _context.Projects
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == projectId && p.ApiKey == apiKey);
+            .Select(p => new { p.Id, p.ApiKey })
+            .FirstOrDefaultAsync(p => p.ApiKey == apiKey, cancellationToken);
 
-        return project != null;
+        return project?.Id;
     }
 }

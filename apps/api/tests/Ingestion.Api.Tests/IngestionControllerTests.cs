@@ -1,4 +1,5 @@
 ﻿using Contracts.Messages;
+using Infrastructure.Auth;
 using Ingestion.Api.Controllers;
 using Ingestion.Api.Models;
 using Microsoft.AspNetCore.Http;
@@ -11,7 +12,8 @@ public class IngestionControllerTests
 {
     private static IngestionController CreateController(Mock<IIngestionService> mockService)
     {
-        var controller = new IngestionController(mockService.Object)
+        var mockValidator = new Mock<IApiKeyValidator>();
+        var controller = new IngestionController(mockService.Object, mockValidator.Object)
         {
             ControllerContext = new()
             {

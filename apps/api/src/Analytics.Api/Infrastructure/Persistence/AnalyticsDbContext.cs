@@ -13,6 +13,7 @@ public class AnalyticsDbContext(DbContextOptions<AnalyticsDbContext> options) : 
 
         modelBuilder.Entity<ProcessedEvent>(entity =>
         {
+            entity.ToTable("processed_events");
             entity.HasKey(e => e.EventId);
             entity.HasIndex(e => e.ProjectId);
             entity.HasIndex(e => e.UserId);

@@ -5,12 +5,11 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Microsoft.IdentityModel.Protocols.Configuration;
 
 namespace Identity.Api.Api.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("api/[controller]")]
 public class AuthController(UserManager<ApplicationUser> userManager, IConfiguration configuration) : ControllerBase
 {
     [HttpPost("login")]
@@ -23,7 +22,27 @@ public class AuthController(UserManager<ApplicationUser> userManager, IConfigura
         if (user is null || !await userManager.CheckPasswordAsync(user, request.Password))
             return Unauthorized("Invalid credentials");
 
-        var jwtKey = configuration["Jwt:Secret"] ?? "super-secret-default-key-for-dev-mcollector";
+        return Ok(CreateTokenResponse(user));
+    }
+
+    [HttpPost("register")]
+    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Register([FromBody] RegisterRequest request)
+    {
+        var user = new ApplicationUser { Email = request.Email, UserName = request.Email };
+        var result = await userManager.CreateAsync(user, request.Password);
+
+        if (!result.Succeeded)
+            return BadRequest(result.Errors.Select(e => e.Description));
+
+        return Ok(CreateTokenResponse(user));
+    }
+
+    private LoginResponse CreateTokenResponse(ApplicationUser user)
+    {
+        var jwtKey = configuration["Jwt:Secret"]
+            ?? throw new InvalidOperationException("Jwt:Secret is not configured.");
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
 
@@ -39,11 +58,11 @@ public class AuthController(UserManager<ApplicationUser> userManager, IConfigura
             signingCredentials: new(key, SecurityAlgorithms.HmacSha256)
         );
 
-        return Ok(new LoginResponse
+        return new LoginResponse
         {
             AccessToken = new JwtSecurityTokenHandler().WriteToken(token),
             ExpiresIn = TimeSpan.FromDays(7).TotalSeconds
-        });
+        };
     }
 }
 
@@ -51,6 +70,13 @@ public class LoginRequest
 {
     public string Email { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
+}
+
+public class RegisterRequest
+{
+    public string Email { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+    public string? OrganizationName { get; set; }
 }
 
 public class LoginResponse

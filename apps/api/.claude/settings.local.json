@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo \"\")",
+      "Bash(echo \"volumes:\")",
+      "Bash(echo \"  postgres_data:\")",
+      "Bash(dotnet build *)",
+      "Bash(pnpm --filter=web exec tsc --noEmit)"
+    ]
+  }
+}

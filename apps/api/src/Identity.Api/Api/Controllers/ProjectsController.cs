@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Identity.Api.Api.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("api/[controller]")]
 [Authorize]
 public class ProjectsController(UserManager<ApplicationUser> userManager, IdentityAppDbContext dbContext, IApiKeyService apiKeyService)
     : ControllerBase

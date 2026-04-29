@@ -1,4 +1,5 @@
 using Contracts.Messages;
+using Infrastructure.Auth;
 using Ingestion.Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -8,7 +9,7 @@ namespace Ingestion.Api.Controllers;
 [ApiController]
 [Route("api/v1/ingest")]
 [Authorize]
-public class IngestionController(IIngestionService ingestionService) : ControllerBase
+public class IngestionController(IIngestionService ingestionService, IApiKeyValidator apiKeyValidator) : ControllerBase
 {
     [HttpGet("health")]
     [AllowAnonymous]
@@ -20,27 +21,15 @@ public class IngestionController(IIngestionService ingestionService) : Controlle
         [FromBody] IngestEventRequest request,
         CancellationToken cancellationToken)
     {
-        // Headers are validated by authentication handler
-        
         if (string.IsNullOrWhiteSpace(request.EventName))
             return BadRequest(new { error = "eventName is required" });
 
         if (string.IsNullOrWhiteSpace(request.UserId) && string.IsNullOrWhiteSpace(request.AnonymousId))
             return BadRequest(new { error = "userId or anonymousId is required" });
 
-        var rawEvent = new RawEvent
-        {
-            ProjectId       = projectId,
-            EventName       = request.EventName,
-            UserId          = request.UserId,
-            AnonymousId     = request.AnonymousId,
-            SessionId       = request.SessionId,
-            Properties      = request.Properties,
-            ClientTimestamp = request.ClientTimestamp,
-            ServerTimestamp = DateTimeOffset.UtcNow,
-            IpAddress       = HttpContext.Connection.RemoteIpAddress?.ToString(),
-            UserAgent       = Request.Headers.UserAgent.ToString()
-        };
+        var rawEvent = BuildRawEvent(projectId, request.EventName,
+            request.UserId, request.AnonymousId, request.SessionId,
+            request.Properties, request.ClientTimestamp);
 
         await ingestionService.IngestAsync(rawEvent, cancellationToken);
         return Accepted();
@@ -52,26 +41,57 @@ public class IngestionController(IIngestionService ingestionService) : Controlle
         [FromBody] List<IngestEventRequest> requests,
         CancellationToken cancellationToken)
     {
-        // Headers are validated by authentication handler
-        
         if (requests.Count > 50)
             return BadRequest(new { error = "Batch size cannot exceed 50 events" });
 
-        var rawEvents = requests.Select(r => new RawEvent
-        {
-            ProjectId       = projectId,
-            EventName       = r.EventName,
-            UserId          = r.UserId,
-            AnonymousId     = r.AnonymousId,
-            SessionId       = r.SessionId,
-            Properties      = r.Properties,
-            ClientTimestamp = r.ClientTimestamp,
-            ServerTimestamp = DateTimeOffset.UtcNow,
-            IpAddress       = HttpContext.Connection.RemoteIpAddress?.ToString(),
-            UserAgent       = Request.Headers.UserAgent.ToString()
-        });
+        var rawEvents = requests.Select(r => BuildRawEvent(projectId, r.EventName,
+            r.UserId, r.AnonymousId, r.SessionId, r.Properties, r.ClientTimestamp));
 
         await ingestionService.IngestBatchAsync(rawEvents, cancellationToken);
         return Accepted();
     }
+
+    // SDK endpoint accepts the JS SDK's native payload shape
+    // Auth is done via writeKey in the body; no JWT/ApiKey headers needed
+    [HttpPost("events")]
+    [AllowAnonymous]
+    public async Task<IActionResult> SdkBatch([FromBody] SdkBatchRequest request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.WriteKey))
+            return BadRequest(new { error = "writeKey is required" });
+
+        if (request.Events.Count > 50)
+            return BadRequest(new { error = "Batch size cannot exceed 50 events" });
+
+        var projectId = await apiKeyValidator.GetProjectIdByApiKeyAsync(request.WriteKey, cancellationToken);
+        if (projectId is null)
+            return Unauthorized(new { error = "Invalid writeKey" });
+
+        var rawEvents = request.Events.Select(e => BuildRawEvent(
+            projectId.Value, e.Event,
+            e.UserId, e.AnonymousId, e.SessionId,
+            e.Properties, e.Timestamp ?? DateTimeOffset.UtcNow,
+            e.UserAgent));
+
+        await ingestionService.IngestBatchAsync(rawEvents, cancellationToken);
+        return Accepted();
+    }
+
+    private RawEvent BuildRawEvent(
+        Guid projectId, string? eventName,
+        string? userId, string? anonymousId, string? sessionId,
+        Dictionary<string, object>? properties, DateTimeOffset clientTimestamp,
+        string? userAgentOverride = null) => new()
+    {
+        ProjectId = projectId,
+        EventName = eventName ?? string.Empty,
+        UserId = userId ?? anonymousId ?? "anonymous",
+        AnonymousId = anonymousId,
+        SessionId = sessionId,
+        Properties = properties,
+        ClientTimestamp = clientTimestamp,
+        ServerTimestamp = DateTimeOffset.UtcNow,
+        IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+        UserAgent = userAgentOverride ?? Request.Headers.UserAgent.ToString()
+    };
 }

@@ -1,12 +1,15 @@
 services:
   postgres:
     image: postgres:18
+    restart: unless-stopped
     environment:
       POSTGRES_USER: app
       POSTGRES_PASSWORD: app
       POSTGRES_DB: mcollector
     ports:
       - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U app -d mcollector"]
       interval: 10s
@@ -60,6 +63,7 @@ services:
     build:
       context: ../../apps/api
       dockerfile: src/Ingestion.Api/Dockerfile
+    restart: unless-stopped
     ports:
       - "5001:8080"
     depends_on:
@@ -70,6 +74,12 @@ services:
     environment:
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=mcollector;Username=app;Password=app
       - Kafka__BootstrapServers=kafka:29092
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/api/v1/ingest/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   analytics:
     build:
@@ -80,36 +90,46 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      kafka-init:
-        condition: service_completed_successfully
     environment:
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=mcollector;Username=app;Password=app
-      - Kafka__BootstrapServers=kafka:29092
+      - Jwt__Secret=${JWT_SECRET:?JWT_SECRET must be set}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   identity:
     build:
       context: ../../apps/api
       dockerfile: src/Identity.Api/Dockerfile
+    restart: unless-stopped
     ports:
       - "5003:8080"
     depends_on:
       postgres:
         condition: service_healthy
-      kafka-init:
-        condition: service_completed_successfully
     environment:
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=mcollector;Username=app;Password=app
-      - Kafka__BootstrapServers=kafka:29092
+      - Jwt__Secret=${JWT_SECRET:?JWT_SECRET must be set}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   processor:
     build:
       context: ../../apps/api
       dockerfile: src/EventProcessor/Dockerfile
+    restart: unless-stopped
     depends_on:
-      postgres:
-        condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
+      analytics:
+        condition: service_healthy
     environment:
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=mcollector;Username=app;Password=app
       - Kafka__BootstrapServers=kafka:29092
@@ -118,14 +138,19 @@ services:
     build:
       context: ../../
       dockerfile: apps/web/Dockerfile
+      args:
+        - NEXT_PUBLIC_IDENTITY_URL=http://localhost:5003
+        - NEXT_PUBLIC_ANALYTICS_URL=http://localhost:5002
+        - NEXT_PUBLIC_INGESTION_URL=http://localhost:5001
     ports:
       - "3000:3000"
     depends_on:
-      - ingestion
-      - analytics
-      - identity
-    environment:
-      - NEXT_PUBLIC_API_URL=http://ingestion:8080
-      - NEXT_PUBLIC_IDENTITY_URL=http://identity:8080
-      - NEXT_PUBLIC_ANALYTICS_URL=http://analytics:8080
-      - NEXT_PUBLIC_INGESTION_URL=http://ingestion:8080
+      ingestion:
+        condition: service_healthy
+      analytics:
+        condition: service_healthy
+      identity:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

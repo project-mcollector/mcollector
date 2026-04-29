@@ -15,6 +15,10 @@ import styles from "../../../dashboard.module.css";
 const BASE_URL =
   process.env.NEXT_PUBLIC_ANALYTICS_URL || "http://localhost:5002";
 
+function analyticsBase(projectId: string | string[]) {
+  return `${BASE_URL}/api/v1/projects/${projectId}/analytics`;
+}
+
 function getDateRange() {
   const now = Date.now();
   return {
@@ -34,14 +38,11 @@ type TimeseriesPoint = {
   count: number;
 };
 
-type EventName = {
-  eventName: string;
-  count: number;
-};
+type EventName = string;
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { projectId } = useParams();
+  const { projectId } = useParams<{ projectId: string }>();
 
   const [overview, setOverview] = useState<Overview | null>(null);
   const [eventsTimeseries, setEventsTimeseries] = useState<TimeseriesPoint[]>(
@@ -64,7 +65,7 @@ export default function DashboardPage() {
 
     const { to, from } = getDateRange();
     const headers = { Authorization: `Bearer ${token}` };
-    const base = `${BASE_URL}/api/v1/projects/${projectId}/analytics`;
+    const base = analyticsBase(projectId);
 
     Promise.all([
       fetch(`${base}/overview?from=${from}&to=${to}`, { headers }).then((r) =>
@@ -76,9 +77,7 @@ export default function DashboardPage() {
       fetch(`${base}/users/timeseries?from=${from}&to=${to}&interval=day`, {
         headers,
       }).then((r) => r.json()),
-      fetch(`${base}/events?projectId=${projectId}`, { headers }).then((r) =>
-        r.json(),
-      ),
+      fetch(`${base}/events`, { headers }).then((r) => r.json()),
     ]).then(([overviewData, eventsData, usersData, eventNamesData]) => {
       setOverview(overviewData);
       setEventsTimeseries(eventsData);
@@ -100,7 +99,7 @@ export default function DashboardPage() {
 
     const { to, from } = getDateRange();
     const headers = { Authorization: `Bearer ${token}` };
-    const base = `${BASE_URL}/api/v1/projects/${projectId}/analytics`;
+    const base = analyticsBase(projectId);
 
     fetch(
       `${base}/events/timeseries?from=${from}&to=${to}&interval=day&eventName=${eventName}`,
@@ -170,21 +169,21 @@ export default function DashboardPage() {
           <tbody>
             {eventNames.map((event) => (
               <>
-                <tr key={event.eventName}>
-                  <td>{event.eventName}</td>
-                  <td>{event.count}</td>
+                <tr key={event}>
+                  <td>{event}</td>
+                  <td></td>
                   <td>
                     <button
                       className={styles.buttonSmall}
-                      onClick={() => handleEventClick(event.eventName)}
+                      onClick={() => handleEventClick(event)}
                     >
-                      {selectedEvent === event.eventName ? "Скрыть" : "График"}
+                      {selectedEvent === event ? "Скрыть" : "График"}
                     </button>
                   </td>
                 </tr>
 
-                {selectedEvent === event.eventName && (
-                  <tr key={`${event.eventName}-chart`}>
+                {selectedEvent === event && (
+                  <tr key={`${event}-chart`}>
                     <td colSpan={3}>
                       <ResponsiveContainer width="100%" height={200}>
                         <LineChart data={selectedEventTimeseries}>

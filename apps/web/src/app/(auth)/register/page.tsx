@@ -50,7 +50,7 @@ export default function RegisterPage() {
         return;
       }
 
-      localStorage.setItem("token", data.token);
+      localStorage.setItem("token", data.accessToken);
       router.push("/projects");
     } catch (err) {
       setError("Ошибка соединения с сервером");

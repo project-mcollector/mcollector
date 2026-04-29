@@ -82,16 +82,16 @@ public class IngestionController(IIngestionService ingestionService, IApiKeyVali
         string? userId, string? anonymousId, string? sessionId,
         Dictionary<string, object>? properties, DateTimeOffset clientTimestamp,
         string? userAgentOverride = null) => new()
-    {
-        ProjectId = projectId,
-        EventName = eventName ?? string.Empty,
-        UserId = userId ?? anonymousId ?? "anonymous",
-        AnonymousId = anonymousId,
-        SessionId = sessionId,
-        Properties = properties,
-        ClientTimestamp = clientTimestamp,
-        ServerTimestamp = DateTimeOffset.UtcNow,
-        IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
-        UserAgent = userAgentOverride ?? Request.Headers.UserAgent.ToString()
-    };
+        {
+            ProjectId = projectId,
+            EventName = eventName ?? string.Empty,
+            UserId = userId ?? anonymousId ?? "anonymous",
+            AnonymousId = anonymousId,
+            SessionId = sessionId,
+            Properties = properties,
+            ClientTimestamp = clientTimestamp,
+            ServerTimestamp = DateTimeOffset.UtcNow,
+            IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+            UserAgent = userAgentOverride ?? Request.Headers.UserAgent.ToString()
+        };
 }

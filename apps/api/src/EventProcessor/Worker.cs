@@ -1,4 +1,5 @@
 namespace EventProcessor;
+
 using Confluent.Kafka;
 using System.Text.Json;
 using global::Contracts.Messages;

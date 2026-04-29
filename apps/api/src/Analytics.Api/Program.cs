@@ -46,7 +46,10 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AnalyticsDbContext>();
-    dbContext.Database.Migrate();
+    if (dbContext.Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory")
+        dbContext.Database.Migrate();
+    else
+        dbContext.Database.EnsureCreated();
 }
 
 if (app.Environment.IsDevelopment())
@@ -66,3 +69,5 @@ app.MapHealthChecks("/health");
 app.MapControllers();
 
 app.Run();
+
+public partial class Program { }

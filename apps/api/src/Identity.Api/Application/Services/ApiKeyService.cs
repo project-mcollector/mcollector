@@ -19,7 +19,7 @@ public class ApiKeyService : IApiKeyService
     {
         const int keyLength = 32;
         var randomBytes = new byte[keyLength];
-        
+
         using (var rng = RandomNumberGenerator.Create())
         {
             rng.GetBytes(randomBytes);

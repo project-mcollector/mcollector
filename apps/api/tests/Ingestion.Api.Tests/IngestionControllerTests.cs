@@ -1,4 +1,4 @@
-﻿using Contracts.Messages;
+using Contracts.Messages;
 using Infrastructure.Auth;
 using Ingestion.Api.Controllers;
 using Ingestion.Api.Models;

@@ -19,6 +19,10 @@ function analyticsBase(projectId: string | string[]) {
   return `${BASE_URL}/api/v1/projects/${projectId}/analytics`;
 }
 
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("ru-RU", { month: "short", day: "numeric" });
+}
+
 function getDateRange() {
   const now = Date.now();
   return {
@@ -121,12 +125,14 @@ export default function DashboardPage() {
         <div>
           <h1 className={styles.title}>Дашборд</h1>
         </div>
-        <button
-          className={styles.buttonOutline}
-          onClick={() => router.push("/projects")}
-        >
-          ← Мои проекты
-        </button>
+        <div style={{ display: "flex", gap: 12 }}>
+          <button className={styles.buttonOutline} onClick={() => router.push("/projects")}>
+            ← Мои проекты
+          </button>
+          <button className={styles.buttonOutline} onClick={() => { localStorage.removeItem("token"); router.push("/login"); }}>
+            Выйти
+          </button>
+        </div>
       </div>
 
       <div className={styles.statsGrid}>
@@ -148,7 +154,7 @@ export default function DashboardPage() {
         <h2 className={styles.chartTitle}>События по дням</h2>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={eventsTimeseries}>
-            <XAxis dataKey="timestamp" />
+            <XAxis dataKey="timestamp" tickFormatter={formatDate} />
             <YAxis />
             <Tooltip />
             <Line type="monotone" dataKey="count" stroke="#8884d8" />
@@ -187,7 +193,7 @@ export default function DashboardPage() {
                     <td colSpan={3}>
                       <ResponsiveContainer width="100%" height={200}>
                         <LineChart data={selectedEventTimeseries}>
-                          <XAxis dataKey="timestamp" />
+                          <XAxis dataKey="timestamp" tickFormatter={formatDate} />
                           <YAxis />
                           <Tooltip />
                           <Line
@@ -210,7 +216,7 @@ export default function DashboardPage() {
         <h2 className={styles.chartTitle}>Пользователи по дням</h2>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={usersTimeseries}>
-            <XAxis dataKey="timestamp" />
+            <XAxis dataKey="timestamp" tickFormatter={formatDate} />
             <YAxis />
             <Tooltip />
             <Line type="monotone" dataKey="count" stroke="#82ca9d" />

@@ -26,6 +26,7 @@ export default function ProjectsPage() {
   const [createdProject, setCreatedProject] = useState<CreatedProject | null>(
     null,
   );
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -65,6 +66,18 @@ export default function ProjectsPage() {
 
   function closeModal() {
     setCreatedProject(null);
+    setCopied(false);
+  }
+
+  function copyApiKey(key: string) {
+    navigator.clipboard.writeText(key);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  function logout() {
+    localStorage.removeItem("token");
+    router.push("/login");
   }
 
   if (loading) return <p>Загрузка...</p>;
@@ -73,6 +86,7 @@ export default function ProjectsPage() {
     <div className={styles.page}>
       <div className={styles.header}>
         <h1 className={styles.title}>Мои проекты</h1>
+        <button className={styles.buttonOutline} onClick={logout}>Выйти</button>
       </div>
 
       {projects.length === 0 && (
@@ -101,11 +115,13 @@ export default function ProjectsPage() {
             placeholder="Название проекта"
             value={newProjectName}
             onChange={(e) => setNewProjectName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && createProject()}
             className={styles.input}
           />
           <button onClick={createProject} className={styles.button}>
             Создать
           </button>
+
         </div>
       </div>
 
@@ -122,11 +138,9 @@ export default function ProjectsPage() {
               <span className={styles.apiKeyText}>{createdProject.apiKey}</span>
               <button
                 className={styles.buttonSmall}
-                onClick={() =>
-                  navigator.clipboard.writeText(createdProject.apiKey)
-                }
+                onClick={() => copyApiKey(createdProject.apiKey)}
               >
-                Скопировать
+                {copied ? "Скопировано ✓" : "Скопировать"}
               </button>
             </div>
 

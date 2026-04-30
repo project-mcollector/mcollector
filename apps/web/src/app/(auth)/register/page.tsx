@@ -40,10 +40,6 @@ export default function RegisterPage() {
       return;
     }
 
-    if (password.length < 8) {
-      setError("Пароль должен быть не менее 8 символов");
-      return;
-    }
 
     setLoading(true);
 
@@ -127,7 +123,6 @@ export default function RegisterPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={8}
                 className={styles.input}
               />
               <button type="button" className={styles.passwordToggle} onClick={() => setShowPassword(v => !v)}>
@@ -140,11 +135,6 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {passwordStrength(password) && (
-            <p style={{ fontSize: 12, marginTop: -8, color: passwordStrength(password)!.color }}>
-              {passwordStrength(password)!.label}
-            </p>
-          )}
 
           <div>
             <label className={styles.label}>Подтвердите пароль</label>

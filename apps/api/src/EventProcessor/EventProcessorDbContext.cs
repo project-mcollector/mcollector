@@ -15,6 +15,7 @@ public class EventProcessorDbContext(DbContextOptions<EventProcessorDbContext> o
         {
             entity.HasKey(e => e.EventId);
             entity.Ignore(e => e.Properties);
+            entity.Property(e => e.PropertiesJson).HasColumnType("jsonb");
 
             entity.ToTable("processed_events");
         });

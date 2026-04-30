@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "../login.module.css";
@@ -17,6 +17,19 @@ export default function RegisterPage() {
   const [organizationName, setOrganizationName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (localStorage.getItem("token")) router.replace("/projects");
+  }, [router]);
+
+  function passwordStrength(pwd: string): { label: string; color: string } | null {
+    if (!pwd) return null;
+    if (pwd.length < 8) return { label: "Слабый", color: "#dc2626" };
+    if (/[A-Z]/.test(pwd) && /[0-9]/.test(pwd)) return { label: "Сильный", color: "#16a34a" };
+    return { label: "Средний", color: "#d97706" };
+  }
+  const [createdProject, setCreatedProject] = useState<{ id: string; apiKey: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -54,7 +67,7 @@ export default function RegisterPage() {
 
       localStorage.setItem("token", data.accessToken);
 
-      await fetch(`${BASE_URL}/api/projects`, {
+      const projectRes = await fetch(`${BASE_URL}/api/projects`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -63,7 +76,8 @@ export default function RegisterPage() {
         body: JSON.stringify({ name: organizationName }),
       });
 
-      router.push("/projects");
+      const project = await projectRes.json();
+      setCreatedProject({ id: project.id, apiKey: project.apiKey });
     } catch (err) {
       setError("Ошибка соединения с сервером");
     } finally {
@@ -126,6 +140,12 @@ export default function RegisterPage() {
             </div>
           </div>
 
+          {passwordStrength(password) && (
+            <p style={{ fontSize: 12, marginTop: -8, color: passwordStrength(password)!.color }}>
+              {passwordStrength(password)!.label}
+            </p>
+          )}
+
           <div>
             <label className={styles.label}>Подтвердите пароль</label>
             <div className={styles.passwordWrapper}>
@@ -159,6 +179,52 @@ export default function RegisterPage() {
           </Link>
         </p>
       </div>
+
+      {createdProject && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modal}>
+            <h2 className={styles.modalTitle}>Проект создан!</h2>
+            <p className={styles.modalSubtitle}>
+              Сохраните ваш API-ключ — он понадобится для установки SDK на сайт
+            </p>
+
+            <label className={styles.label}>Ваш API-ключ</label>
+            <div className={styles.apiKeyBox}>
+              <span className={styles.apiKeyText}>{createdProject.apiKey}</span>
+              <button
+                className={styles.buttonSmall}
+                onClick={() => {
+                  navigator.clipboard.writeText(createdProject.apiKey);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+              >
+                {copied ? "Скопировано ✓" : "Скопировать"}
+              </button>
+            </div>
+
+            <label className={styles.label}>Добавьте на ваш сайт</label>
+            <div className={styles.codeBlock}>
+              {`<script>\n  analytics.init('${createdProject.apiKey}')\n</script>`}
+            </div>
+
+            <div className={styles.modalButtons}>
+              <button
+                className={styles.button}
+                onClick={() => router.push(`/projects/${createdProject.id}/dashboard`)}
+              >
+                Перейти в дашборд
+              </button>
+              <button
+                className={styles.buttonOutline}
+                onClick={() => router.push("/projects")}
+              >
+                К проектам
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

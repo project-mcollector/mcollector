@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "../dashboard.module.css";
+import { authFetch } from "@/lib/auth";
 
 type Project = {
   id: string;
@@ -23,6 +24,7 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [newProjectName, setNewProjectName] = useState("");
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
   const [createdProject, setCreatedProject] = useState<CreatedProject | null>(
     null,
   );
@@ -35,33 +37,31 @@ export default function ProjectsPage() {
       return;
     }
 
-    fetch(`${BASE_URL}/api/projects`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    authFetch(`${BASE_URL}/api/projects`, router)
       .then((res) => res.json())
       .then((data) => {
         setProjects(data);
         setLoading(false);
-      });
+      })
+      .catch(() => setLoading(false));
   }, [router]);
 
   async function createProject() {
-    if (!newProjectName.trim()) return;
-    const token = localStorage.getItem("token");
-
-    const res = await fetch(`${BASE_URL}/api/projects`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ name: newProjectName }),
-    });
-
-    const created = await res.json();
-    setProjects([...projects, created]);
-    setNewProjectName("");
-    setCreatedProject(created);
+    if (!newProjectName.trim() || creating) return;
+    setCreating(true);
+    try {
+      const res = await authFetch(`${BASE_URL}/api/projects`, router, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newProjectName }),
+      });
+      const created = await res.json();
+      setProjects([...projects, created]);
+      setNewProjectName("");
+      setCreatedProject(created);
+    } finally {
+      setCreating(false);
+    }
   }
 
   function closeModal() {
@@ -80,7 +80,16 @@ export default function ProjectsPage() {
     router.push("/login");
   }
 
-  if (loading) return <p>Загрузка...</p>;
+  if (loading) return (
+    <div className={styles.page}>
+      <div className={styles.header}>
+        <h1 className={styles.title}>Мои проекты</h1>
+      </div>
+      <div className={styles.projectsGrid}>
+        {[...Array(3)].map((_, i) => <div key={i} className={styles.skeletonCard} />)}
+      </div>
+    </div>
+  );
 
   return (
     <div className={styles.page}>
@@ -95,14 +104,14 @@ export default function ProjectsPage() {
 
       <div className={styles.projectsGrid}>
         {projects.map((project) => (
-          <div key={project.id} className={styles.projectCard}>
+          <div
+            key={project.id}
+            className={styles.projectCard}
+            onClick={() => router.push(`/projects/${project.id}/dashboard`)}
+            style={{ cursor: "pointer" }}
+          >
             <span className={styles.projectName}>{project.name}</span>
-            <button
-              className={styles.buttonSmall}
-              onClick={() => router.push(`/projects/${project.id}/dashboard`)}
-            >
-              Открыть
-            </button>
+            <span className={styles.projectArrow}>→</span>
           </div>
         ))}
       </div>
@@ -118,10 +127,9 @@ export default function ProjectsPage() {
             onKeyDown={(e) => e.key === "Enter" && createProject()}
             className={styles.input}
           />
-          <button onClick={createProject} className={styles.button}>
-            Создать
+          <button onClick={createProject} disabled={creating} className={styles.button}>
+            {creating ? "Создание..." : "Создать"}
           </button>
-
         </div>
       </div>
 

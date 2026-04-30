@@ -300,6 +300,61 @@
     gap: 12px;
 }
 
+/* Skeleton */
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.skeletonCard {
+    height: 72px;
+    border-radius: 12px;
+    background: linear-gradient(90deg, #f4f4f5 25%, #e4e4e7 50%, #f4f4f5 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+}
+
+.projectArrow {
+    color: #a1a1aa;
+    font-size: 18px;
+}
+
+/* Date range picker */
+.dateRange {
+    display: flex;
+    gap: 4px;
+    background: #f4f4f5;
+    border-radius: 8px;
+    padding: 4px;
+}
+
+.dateRangeBtn {
+    background: none;
+    border: none;
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #71717a;
+    cursor: pointer;
+}
+
+.dateRangeBtn:hover {
+    color: #18181b;
+}
+
+.dateRangeActive {
+    background: white;
+    border: none;
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #18181b;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
 /* Навигация */
 .backLink {
     font-size: 14px;

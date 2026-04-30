@@ -15,10 +15,17 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (localStorage.getItem("token")) router.replace("/projects");
+    if (localStorage.getItem("token")) {
+      router.replace("/projects");
+    } else {
+      setReady(true);
+    }
   }, [router]);
+
+  if (!ready) return null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -61,6 +68,7 @@ export default function LoginPage() {
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              required
               className={styles.input}
             />
           </div>
@@ -73,6 +81,7 @@ export default function LoginPage() {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                required
                 className={styles.input}
               />
               <button type="button" className={styles.passwordToggle} onClick={() => setShowPassword(v => !v)}>

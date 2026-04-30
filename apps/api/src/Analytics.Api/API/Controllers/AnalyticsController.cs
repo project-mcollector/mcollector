@@ -75,6 +75,26 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
         return Ok(properties);
     }
 
+    [HttpGet("events/counts")]
+    public async Task<IActionResult> GetEventCounts(
+        Guid projectId,
+        [FromQuery] DateTimeOffset? from,
+        [FromQuery] DateTimeOffset? to)
+    {
+        var query = dbContext.ProcessedEvents.AsNoTracking().Where(e => e.ProjectId == projectId);
+
+        if (from.HasValue) query = query.Where(e => e.Timestamp >= from.Value);
+        if (to.HasValue) query = query.Where(e => e.Timestamp <= to.Value);
+
+        var counts = await query
+            .GroupBy(e => e.EventName)
+            .Select(g => new { name = g.Key, count = g.Count() })
+            .OrderByDescending(x => x.count)
+            .ToListAsync();
+
+        return Ok(counts);
+    }
+
     [HttpGet("events/timeseries")]
     public async Task<IActionResult> GetEventsTimeseries(
         Guid projectId,

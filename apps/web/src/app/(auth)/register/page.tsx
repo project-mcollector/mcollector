@@ -22,6 +22,15 @@ export default function RegisterPage() {
     if (localStorage.getItem("token")) router.replace("/projects");
   }, [router]);
 
+  function validatePassword(pwd: string): string[] {
+    const errors = []
+    if (pwd.length < 6) errors.push('Не менее 6 символов')
+    if (!/[a-z]/.test(pwd)) errors.push('Строчная буква (a-z)')
+    if (!/[A-Z]/.test(pwd)) errors.push('Заглавная буква (A-Z)')
+    if (!/[^a-zA-Z0-9]/.test(pwd)) errors.push('Специальный символ (!@#$ и т.д.)')
+    return errors
+  }
+
   function passwordStrength(pwd: string): { label: string; color: string } | null {
     if (!pwd) return null;
     if (pwd.length < 8) return { label: "Слабый", color: "#dc2626" };
@@ -40,6 +49,11 @@ export default function RegisterPage() {
       return;
     }
 
+    const passwordErrors = validatePassword(password)
+    if (passwordErrors.length > 0) {
+      setError('Пароль не соответствует требованиям')
+      return
+    }
 
     setLoading(true);
 
@@ -133,6 +147,27 @@ export default function RegisterPage() {
                 )}
               </button>
             </div>
+            {password && (
+              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {[
+                  { check: password.length >= 6, label: 'Не менее 6 символов' },
+                  { check: /[a-z]/.test(password), label: 'Строчная буква (a-z)' },
+                  { check: /[A-Z]/.test(password), label: 'Заглавная буква (A-Z)' },
+                  { check: /[^a-zA-Z0-9]/.test(password), label: 'Специальный символ (!@#$)' },
+                ].map(({ check, label }) => (
+                  <div key={label} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 12,
+                    color: check ? '#16a34a' : '#a1a1aa'
+                  }}>
+                    <span style={{ fontSize: 14 }}>{check ? '✓' : '○'}</span>
+                    {label}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
 

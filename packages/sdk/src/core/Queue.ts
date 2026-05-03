@@ -72,7 +72,7 @@ export class Queue {
         events: batch
       };
 
-      const host = this.options.apiHost || 'http://localhost:5000/api/ingestion';
+      const host = this.options.apiHost || 'http://localhost:5001/api/v1/ingest';
       const endpoint = `${host.replace(/\/$/, '')}/events`;
 
       const response = await fetch(endpoint, {
@@ -126,7 +126,7 @@ export class Queue {
       events: batch
     };
 
-    const host = this.options.apiHost || 'http://localhost:5000/api/ingestion';
+    const host = this.options.apiHost || 'http://localhost:5001/api/v1/ingest';
     const endpoint = `${host.replace(/\/$/, '')}/events`;
 
     if (typeof navigator !== 'undefined' && navigator.sendBeacon) {

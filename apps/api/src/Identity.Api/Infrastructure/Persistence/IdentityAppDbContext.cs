@@ -1,4 +1,4 @@
-using Identity.Api.Infrastructure.Identity;
+using Identity.Api.Domain.Entities;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 

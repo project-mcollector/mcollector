@@ -1,5 +1,5 @@
 using Identity.Api.Application.Services;
-using Identity.Api.Infrastructure.Identity;
+using Identity.Api.Domain.Entities;
 using Identity.Api.Infrastructure.Persistence;
 using Infrastructure.Auth;
 using Microsoft.EntityFrameworkCore;
@@ -11,13 +11,7 @@ builder.Configuration
     .AddJsonFile($"config/appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true)
     .AddEnvironmentVariables();
 
-builder.Services.AddOpenApi(options =>
-{
-    options.AddDocumentTransformer((document, _, _) =>
-    {
-        return Task.CompletedTask;
-    });
-});
+builder.Services.AddOpenApi(options => { options.AddDocumentTransformer((_, _, _) => Task.CompletedTask); });
 
 builder.Services.AddAuthorizationBuilder()
     .SetDefaultPolicy(new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
@@ -30,8 +24,8 @@ builder.Services.AddSharedAuthentication(builder.Configuration);
 builder.Services.AddDbContext<IdentityAppDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-        ?? Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
-        ?? "Host=postgres;Database=mcollector;Username=app;Password=app";
+                           ?? Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+                           ?? "Host=postgres;Database=mcollector;Username=app;Password=app";
 
     options.UseNpgsql(connectionString);
 });
@@ -40,6 +34,9 @@ builder.Services.AddIdentityCore<ApplicationUser>()
     .AddEntityFrameworkStores<IdentityAppDbContext>();
 
 builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IProjectsService, ProjectsService>();
+builder.Services.AddScoped<IUsersService, UsersService>();
 
 builder.Services.AddHealthChecks();
 builder.Services.AddControllers();
@@ -49,7 +46,7 @@ builder.Services.AddCors(options =>
     options.AddDefaultPolicy(policy =>
     {
         var origins = builder.Configuration["AllowedOrigins"]?.Split(',')
-            ?? ["http://localhost:3000"];
+                      ?? ["http://localhost:3000"];
         policy.WithOrigins(origins)
             .AllowAnyHeader()
             .AllowAnyMethod();
@@ -61,7 +58,10 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<IdentityAppDbContext>();
-    dbContext.Database.Migrate();
+    if (dbContext.Database.IsRelational())
+        dbContext.Database.Migrate();
+    else
+        dbContext.Database.EnsureCreated();
 }
 
 if (app.Environment.IsDevelopment())

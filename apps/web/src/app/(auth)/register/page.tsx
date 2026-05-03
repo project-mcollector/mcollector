@@ -31,12 +31,6 @@ export default function RegisterPage() {
     return errors
   }
 
-  function passwordStrength(pwd: string): { label: string; color: string } | null {
-    if (!pwd) return null;
-    if (pwd.length < 8) return { label: "Слабый", color: "#dc2626" };
-    if (/[A-Z]/.test(pwd) && /[0-9]/.test(pwd)) return { label: "Сильный", color: "#16a34a" };
-    return { label: "Средний", color: "#d97706" };
-  }
   const [createdProject, setCreatedProject] = useState<{ id: string; apiKey: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -88,8 +82,8 @@ export default function RegisterPage() {
 
       const project = await projectRes.json();
       setCreatedProject({ id: project.id, apiKey: project.apiKey });
-    } catch (err) {
-      setError("Ошибка соединения с сервером");
+    } catch (e) {
+      setError(`Ошибка соединения с сервером ${e}`);
     } finally {
       setLoading(false);
     }

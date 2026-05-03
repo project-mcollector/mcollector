@@ -4,6 +4,7 @@ using Ingestion.Api.Controllers;
 using Ingestion.Api.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace Ingestion.Api.Tests;
@@ -13,7 +14,7 @@ public class IngestionControllerTests
     private static IngestionController CreateController(Mock<IIngestionService> mockService)
     {
         var mockValidator = new Mock<IApiKeyValidator>();
-        var controller = new IngestionController(mockService.Object, mockValidator.Object)
+        var controller = new IngestionController(mockService.Object, mockValidator.Object, NullLogger<IngestionController>.Instance)
         {
             ControllerContext = new()
             {

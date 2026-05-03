@@ -80,7 +80,7 @@ export default function ProjectsPage() {
         alert("Не удалось удалить проект: " + text);
       }
     } catch (e) {
-      alert("Не удалось удалить проект");
+      alert(`Не удалось удалить проект ${e}`);
     } finally {
       setDeleting(null);
     }

@@ -1,7 +1,9 @@
-name: Deploy
+name: CI / CD
 
 on:
   push:
+    branches: [main]
+  pull_request:
     branches: [main]
 
 env:
@@ -9,7 +11,88 @@ env:
   REGISTRY: europe-north1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/mcollector
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: API format check
+        run: dotnet format apps/api/Api.sln --verify-no-changes
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install
+      - name: Frontend lint
+        run: pnpm --filter web lint
+
+  build:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ hashFiles('apps/api/**/*.csproj') }}
+          restore-keys: nuget-
+      - name: Build API
+        run: |
+          dotnet restore apps/api/Api.sln
+          dotnet build apps/api/Api.sln --no-restore
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install
+      - name: Build frontend
+        run: pnpm --filter web build
+      - name: Build SDK
+        run: pnpm --filter @mcollector/sdk build
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ hashFiles('apps/api/**/*.csproj') }}
+          restore-keys: nuget-
+      - name: API tests
+        run: |
+          dotnet restore apps/api/Api.sln
+          dotnet build apps/api/Api.sln --no-restore
+          dotnet test apps/api/Api.sln --no-build
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install
+      - name: SDK tests
+        run: pnpm --filter @mcollector/sdk test
+
   build-and-push:
+    needs: test
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,9 +100,7 @@ jobs:
       - uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
-
       - uses: google-github-actions/setup-gcloud@v2
-
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
@@ -68,7 +149,6 @@ jobs:
       - uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
-
       - uses: google-github-actions/setup-gcloud@v2
 
       - name: Prepare VM directories

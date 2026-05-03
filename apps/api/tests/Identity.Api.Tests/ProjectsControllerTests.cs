@@ -1,144 +1,88 @@
-using System.Security.Claims;
 using Identity.Api.Api.Controllers;
 using Identity.Api.Application.Services;
-using Identity.Api.Infrastructure.Identity;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Moq;
+using Utilities;
 
 namespace Identity.Api.Tests;
 
 public class ProjectsControllerTests
 {
+    private static readonly string UserId = Guid.NewGuid().ToString();
+
     [Fact]
-    public async Task GetProjects_ReturnsOnlyOwnedProjects()
+    public async Task GetProjects_ReturnsOkWithList()
     {
-        await using var dbContext = TestHelpers.CreateDbContext();
-        var user = new ApplicationUser
+        var projects = new List<ProjectDto>
         {
-            Id = Guid.NewGuid().ToString(),
-            Email = "owner@acme.dev",
-            UserName = "owner@acme.dev"
+            new(Guid.NewGuid(), "Alpha", "desc", "proj_abc"),
+            new(Guid.NewGuid(), "Beta", "desc", "proj_xyz"),
         };
-        var ownedProject = new Project { Name = "Owned", Description = "Owned project" };
-        var otherProject = new Project { Name = "Other", Description = "Other project" };
 
-        user.Projects.Add(ownedProject);
-        dbContext.Users.Add(user);
-        dbContext.Projects.AddRange(ownedProject, otherProject);
-        await dbContext.SaveChangesAsync();
+        var service = new Mock<IProjectsService>();
+        service.Setup(x => x.GetProjectsAsync(UserId)).ReturnsAsync(projects);
 
-        var userManager = TestHelpers.CreateUserManagerMock();
-        userManager.Setup(x => x.GetUserAsync(It.IsAny<ClaimsPrincipal>())).ReturnsAsync(user);
-
-        var controller = new ProjectsController(userManager.Object, dbContext, Mock.Of<IApiKeyService>())
+        var controller = new ProjectsController(service.Object)
         {
-            ControllerContext = new()
-            {
-                HttpContext = new DefaultHttpContext
-                {
-                    User = new(new ClaimsIdentity([
-                        new(ClaimTypes.NameIdentifier, user.Id)
-                    ], "TestAuth"))
-                }
-            }
+            ControllerContext = TestHelpers.ControllerContextFor(UserId)
         };
 
         var result = await controller.GetProjects();
 
         var ok = Assert.IsType<OkObjectResult>(result);
-        var response = Assert.IsType<List<ProjectResponse>>(ok.Value);
-        Assert.Single(response);
-        Assert.Equal(ownedProject.Id, response[0].Id);
-        Assert.Equal(ownedProject.Name, response[0].Name);
+        Assert.Equal(projects, ok.Value);
     }
 
     [Fact]
-    public async Task CreateProject_CreatesProjectAndAssignsUser()
+    public async Task GetProject_NotFound_Returns404()
     {
-        await using var dbContext = TestHelpers.CreateDbContext();
-        var user = new ApplicationUser
+        var id = Guid.NewGuid();
+        var service = new Mock<IProjectsService>();
+        service.Setup(x => x.GetProjectAsync(id, UserId))
+            .ReturnsAsync(Errors.NotFound("Project", id));
+
+        var controller = new ProjectsController(service.Object)
         {
-            Id = Guid.NewGuid().ToString(),
-            Email = "owner@acme.dev",
-            UserName = "owner@acme.dev"
-        };
-        dbContext.Users.Add(user);
-        await dbContext.SaveChangesAsync();
-
-        var userManager = TestHelpers.CreateUserManagerMock();
-        userManager.Setup(x => x.GetUserAsync(It.IsAny<ClaimsPrincipal>())).ReturnsAsync(user);
-
-        var apiKeyService = new Mock<IApiKeyService>();
-        apiKeyService.Setup(x => x.GenerateApiKey()).Returns("proj_test_api_key");
-
-        var controller = new ProjectsController(userManager.Object, dbContext, apiKeyService.Object)
-        {
-            ControllerContext = new()
-            {
-                HttpContext = new DefaultHttpContext
-                {
-                    User = new(new ClaimsIdentity([
-                        new(ClaimTypes.NameIdentifier, user.Id)
-                    ], "TestAuth"))
-                }
-            }
+            ControllerContext = TestHelpers.ControllerContextFor(UserId)
         };
 
-        var result = await controller.CreateProject(new()
-        {
-            Name = "New project",
-            Description = "Created in test"
-        });
-
-        var ok = Assert.IsType<OkObjectResult>(result);
-        var response = Assert.IsType<ProjectResponse>(ok.Value);
-        Assert.Equal("proj_test_api_key", response.ApiKey);
-        Assert.Equal("New project", response.Name);
-
-        var storedProject = await dbContext.Projects.Include(p => p.Users).SingleAsync();
-        Assert.Equal("New project", storedProject.Name);
-        Assert.Single(storedProject.Users);
-        Assert.Equal(user.Id, storedProject.Users.Single().Id);
-    }
-
-    [Fact]
-    public async Task GetProject_UserWithoutAccess_ReturnsNotFound()
-    {
-        await using var dbContext = TestHelpers.CreateDbContext();
-        var user = new ApplicationUser
-        {
-            Id = Guid.NewGuid().ToString(),
-            Email = "owner@acme.dev",
-            UserName = "owner@acme.dev"
-        };
-        var project = new Project { Name = "Private", Description = "Private project" };
-
-        dbContext.Users.Add(user);
-        dbContext.Projects.Add(project);
-        await dbContext.SaveChangesAsync();
-
-        var userManager = TestHelpers.CreateUserManagerMock();
-        userManager.Setup(x => x.GetUserAsync(It.IsAny<ClaimsPrincipal>())).ReturnsAsync(user);
-
-        var controller = new ProjectsController(userManager.Object, dbContext, Mock.Of<IApiKeyService>())
-        {
-            ControllerContext = new()
-            {
-                HttpContext = new DefaultHttpContext
-                {
-                    User = new(new ClaimsIdentity([
-                        new Claim(ClaimTypes.NameIdentifier, user.Id)
-                    ], "TestAuth"))
-                }
-            }
-        };
-
-        var result = await controller.GetProject(project.Id);
+        var result = await controller.GetProject(id);
 
         Assert.IsType<NotFoundResult>(result);
     }
+
+    [Fact]
+    public async Task DeleteProject_Success_Returns204()
+    {
+        var id = Guid.NewGuid();
+        var service = new Mock<IProjectsService>();
+        service.Setup(x => x.DeleteProjectAsync(id, UserId)).ReturnsAsync(Result.Success());
+
+        var controller = new ProjectsController(service.Object)
+        {
+            ControllerContext = TestHelpers.ControllerContextFor(UserId)
+        };
+
+        var result = await controller.DeleteProject(id);
+
+        Assert.IsType<NoContentResult>(result);
+    }
+
+    [Fact]
+    public async Task AddMember_AlreadyMember_Returns400()
+    {
+        var id = Guid.NewGuid();
+        var service = new Mock<IProjectsService>();
+        service.Setup(x => x.AddMemberAsync(id, UserId, "dup@example.com"))
+            .ReturnsAsync(Errors.Conflict("User is already a member of this project"));
+
+        var controller = new ProjectsController(service.Object)
+        {
+            ControllerContext = TestHelpers.ControllerContextFor(UserId)
+        };
+
+        var result = await controller.AddMember(id, new() { Email = "dup@example.com" });
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
 }
-
-

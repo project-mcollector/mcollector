@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   LineChart,
@@ -16,7 +16,7 @@ import { authFetch } from "@/lib/auth";
 const BASE_URL =
   process.env.NEXT_PUBLIC_ANALYTICS_URL || "http://localhost:5002";
 
-function analyticsBase(projectId: string | string[]) {
+function analyticsBase(projectId: string) {
   return `${BASE_URL}/api/v1/projects/${projectId}/analytics`;
 }
 
@@ -29,7 +29,10 @@ function getDateRange(days: number) {
 }
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("ru-RU", { month: "short", day: "numeric" });
+  return new Date(iso).toLocaleDateString("ru-RU", {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 type Overview = {
@@ -50,9 +53,12 @@ type EventCount = {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { projectId } = useParams<{ projectId: string }>();
+  const params = useParams();
+  const projectId = params.projectId as string;
 
   const [days, setDays] = useState(30);
+  const [refreshKey, setRefreshKey] = useState(0);
+
   const [overview, setOverview] = useState<Overview | null>(null);
   const [eventsTimeseries, setEventsTimeseries] = useState<TimeseriesPoint[]>([]);
   const [usersTimeseries, setUsersTimeseries] = useState<TimeseriesPoint[]>([]);
@@ -61,38 +67,54 @@ export default function DashboardPage() {
   const [selectedEventTimeseries, setSelectedEventTimeseries] = useState<TimeseriesPoint[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchData = useCallback(() => {
-    const { to, from } = getDateRange(days);
-    const base = analyticsBase(projectId);
-
-    setLoading(true);
-    setSelectedEvent(null);
-    setSelectedEventTimeseries([]);
-
-    Promise.all([
-      authFetch(`${base}/overview?from=${from}&to=${to}`, router).then((r) => r.json()),
-      authFetch(`${base}/events/timeseries?from=${from}&to=${to}&interval=day`, router).then((r) => r.json()),
-      authFetch(`${base}/users/timeseries?from=${from}&to=${to}&interval=day`, router).then((r) => r.json()),
-      authFetch(`${base}/events/counts?from=${from}&to=${to}`, router).then((r) => r.json()),
-    ])
-      .then(([overviewData, eventsData, usersData, countsData]) => {
-        setOverview(overviewData);
-        setEventsTimeseries(eventsData);
-        setUsersTimeseries(usersData);
-        setEventCounts(countsData);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [projectId, days, router]);
-
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
       router.push("/login");
-      return;
     }
-    fetchData();
-  }, [fetchData, router]);
+  }, [router]);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    let cancelled = false;
+
+    async function load() {
+      const { to, from } = getDateRange(days);
+      const base = analyticsBase(projectId);
+
+      setLoading(true);
+      setSelectedEvent(null);
+      setSelectedEventTimeseries([]);
+
+      try {
+        const [overviewData, eventsData, usersData, countsData] =
+          await Promise.all([
+            authFetch(`${base}/overview?from=${from}&to=${to}`, router).then((r) => r.json()),
+            authFetch(`${base}/events/timeseries?from=${from}&to=${to}&interval=day`, router).then((r) => r.json()),
+            authFetch(`${base}/users/timeseries?from=${from}&to=${to}&interval=day`, router).then((r) => r.json()),
+            authFetch(`${base}/events/counts?from=${from}&to=${to}`, router).then((r) => r.json()),
+          ]);
+
+        if (cancelled) return;
+
+        setOverview(overviewData);
+        setEventsTimeseries(eventsData);
+        setUsersTimeseries(usersData);
+        setEventCounts(countsData);
+      } catch {
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, days, refreshKey, router]);
 
   function handleEventClick(eventName: string) {
     if (selectedEvent === eventName) {
@@ -116,15 +138,19 @@ export default function DashboardPage() {
       .catch(() => {});
   }
 
-  if (loading) return (
-    <div className={styles.page}>
-      <div className={styles.statsGrid}>
-        {[...Array(3)].map((_, i) => <div key={i} className={styles.skeletonCard} />)}
+  if (loading)
+    return (
+      <div className={styles.page}>
+        <div className={styles.statsGrid}>
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className={styles.skeletonCard} />
+          ))}
+        </div>
       </div>
-    </div>
-  );
+    );
 
-  if (!overview) return <p className={styles.emptyState}>Нет данных</p>;
+  if (!overview)
+    return <p className={styles.emptyState}>Нет данных</p>;
 
   return (
     <div className={styles.page}>
@@ -132,23 +158,45 @@ export default function DashboardPage() {
         <div>
           <h1 className={styles.title}>Дашборд</h1>
         </div>
+
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <div className={styles.dateRange}>
             {[7, 30, 90].map((d) => (
               <button
                 key={d}
-                className={days === d ? styles.dateRangeActive : styles.dateRangeBtn}
+                className={
+                  days === d
+                    ? styles.dateRangeActive
+                    : styles.dateRangeBtn
+                }
                 onClick={() => setDays(d)}
               >
                 {d}д
               </button>
             ))}
           </div>
-          <button className={styles.buttonOutline} onClick={fetchData}>↻ Обновить</button>
-          <button className={styles.buttonOutline} onClick={() => router.push("/projects")}>
+
+          <button
+            className={styles.buttonOutline}
+            onClick={() => setRefreshKey((k) => k + 1)}
+          >
+            ↻ Обновить
+          </button>
+
+          <button
+            className={styles.buttonOutline}
+            onClick={() => router.push("/projects")}
+          >
             ← Мои проекты
           </button>
-          <button className={styles.buttonOutline} onClick={() => { localStorage.removeItem("token"); router.push("/login"); }}>
+
+          <button
+            className={styles.buttonOutline}
+            onClick={() => {
+              localStorage.removeItem("token");
+              router.push("/login");
+            }}
+          >
             Выйти
           </button>
         </div>
@@ -185,44 +233,51 @@ export default function DashboardPage() {
         <h2 className={styles.chartTitle}>События</h2>
         <table className={styles.table}>
           <thead>
-            <tr>
-              <th>Название</th>
-              <th>Количество</th>
-              <th></th>
-            </tr>
+          <tr>
+            <th>Название</th>
+            <th>Количество</th>
+            <th></th>
+          </tr>
           </thead>
           <tbody>
-            {eventCounts.map((event) => (
-              <Fragment key={event.name}>
+          {eventCounts.map((event) => (
+            <Fragment key={event.name}>
+              <tr>
+                <td>{event.name}</td>
+                <td>{event.count}</td>
+                <td>
+                  <button
+                    className={styles.buttonSmall}
+                    onClick={() => handleEventClick(event.name)}
+                  >
+                    {selectedEvent === event.name ? "Скрыть" : "График"}
+                  </button>
+                </td>
+              </tr>
+
+              {selectedEvent === event.name && (
                 <tr>
-                  <td>{event.name}</td>
-                  <td>{event.count}</td>
-                  <td>
-                    <button
-                      className={styles.buttonSmall}
-                      onClick={() => handleEventClick(event.name)}
-                    >
-                      {selectedEvent === event.name ? "Скрыть" : "График"}
-                    </button>
+                  <td colSpan={3}>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <LineChart data={selectedEventTimeseries}>
+                        <XAxis
+                          dataKey="timestamp"
+                          tickFormatter={formatDate}
+                        />
+                        <YAxis />
+                        <Tooltip />
+                        <Line
+                          type="monotone"
+                          dataKey="count"
+                          stroke="#8884d8"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
                   </td>
                 </tr>
-
-                {selectedEvent === event.name && (
-                  <tr>
-                    <td colSpan={3}>
-                      <ResponsiveContainer width="100%" height={200}>
-                        <LineChart data={selectedEventTimeseries}>
-                          <XAxis dataKey="timestamp" tickFormatter={formatDate} />
-                          <YAxis />
-                          <Tooltip />
-                          <Line type="monotone" dataKey="count" stroke="#8884d8" />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            ))}
+              )}
+            </Fragment>
+          ))}
           </tbody>
         </table>
       </div>

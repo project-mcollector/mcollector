@@ -41,10 +41,12 @@ public class ProjectForValidation
 public class ApiKeyValidator : IApiKeyValidator
 {
     private readonly IdentityValidationContext _context;
+    private readonly ILogger<ApiKeyValidator> _logger;
 
-    public ApiKeyValidator(IdentityValidationContext context)
+    public ApiKeyValidator(IdentityValidationContext context, ILogger<ApiKeyValidator> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     public async Task<bool> ValidateApiKeyAsync(Guid projectId, string apiKey)
@@ -59,12 +61,21 @@ public class ApiKeyValidator : IApiKeyValidator
 
     public async Task<Guid?> GetProjectIdByApiKeyAsync(string apiKey, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(apiKey)) return null;
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            _logger.LogWarning("GetProjectIdByApiKey called with empty key");
+            return null;
+        }
 
         var project = await _context.Projects
             .AsNoTracking()
             .Select(p => new { p.Id, p.ApiKey })
             .FirstOrDefaultAsync(p => p.ApiKey == apiKey, cancellationToken);
+
+        if (project is null)
+            _logger.LogWarning("Invalid write key presented");
+        else
+            _logger.LogDebug("Write key resolved to project {ProjectId}", project.Id);
 
         return project?.Id;
     }

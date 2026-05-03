@@ -1,6 +1,7 @@
 using Contracts.Messages;
 using Ingestion.Api.Services;
 using Infrastructure.Messaging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 public class IngestionServiceTests
@@ -9,7 +10,7 @@ public class IngestionServiceTests
     public async Task IngestAsync_CallsPublisher()
     {
         var mockPublisher = new Mock<IEventPublisher>();
-        var service = new IngestionService(mockPublisher.Object);
+        var service = new IngestionService(mockPublisher.Object, NullLogger<IngestionService>.Instance);
 
         var rawEvent = new RawEvent
         {
@@ -28,7 +29,7 @@ public class IngestionServiceTests
     public async Task IngestBatchAsync_CallsPublisherForEachEvent()
     {
         var mockPublisher = new Mock<IEventPublisher>();
-        var service = new IngestionService(mockPublisher.Object);
+        var service = new IngestionService(mockPublisher.Object, NullLogger<IngestionService>.Instance);
 
         var events = new List<RawEvent>
         {

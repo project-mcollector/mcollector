@@ -27,5 +27,27 @@ public class SdkEventRequest
     public string? SessionId { get; set; }
     public Dictionary<string, object>? Properties { get; set; }
     public DateTimeOffset? Timestamp { get; set; }
+    public SdkEventContext? Context { get; set; }
+}
+
+public class SdkEventContext
+{
+    public string? Url { get; set; }
+    public string? Referrer { get; set; }
     public string? UserAgent { get; set; }
+    public SdkEventScreen? Screen { get; set; }
+    public SdkEventUtm? Utm { get; set; }
+}
+
+public class SdkEventScreen
+{
+    public int Width { get; set; }
+    public int Height { get; set; }
+}
+
+public class SdkEventUtm
+{
+    public string? Source { get; set; }
+    public string? Medium { get; set; }
+    public string? Campaign { get; set; }
 }

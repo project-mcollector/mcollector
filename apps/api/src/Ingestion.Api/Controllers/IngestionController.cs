@@ -9,7 +9,10 @@ namespace Ingestion.Api.Controllers;
 [ApiController]
 [Route("api/v1/ingest")]
 [Authorize]
-public class IngestionController(IIngestionService ingestionService, IApiKeyValidator apiKeyValidator) : ControllerBase
+public class IngestionController(
+    IIngestionService ingestionService,
+    IApiKeyValidator apiKeyValidator,
+    ILogger<IngestionController> logger) : ControllerBase
 {
     [HttpGet("health")]
     [AllowAnonymous]
@@ -67,14 +70,45 @@ public class IngestionController(IIngestionService ingestionService, IApiKeyVali
         if (projectId is null)
             return Unauthorized(new { error = "Invalid writeKey" });
 
-        var rawEvents = request.Events.Select(e => BuildRawEvent(
-            projectId.Value, e.Event,
-            e.UserId, e.AnonymousId, e.SessionId,
-            e.Properties, e.Timestamp ?? DateTimeOffset.UtcNow,
-            e.UserAgent));
+        logger.LogInformation("SDK batch: {Count} events for project {ProjectId}", request.Events.Count, projectId);
+
+        var rawEvents = request.Events.Select(e =>
+        {
+            var props = MergeContext(e.Properties, e.Context);
+            var userAgent = e.Context?.UserAgent;
+            return BuildRawEvent(
+                projectId.Value, e.Event,
+                e.UserId, e.AnonymousId, e.SessionId,
+                props, e.Timestamp ?? DateTimeOffset.UtcNow,
+                userAgent);
+        });
 
         await ingestionService.IngestBatchAsync(rawEvents, cancellationToken);
         return Accepted();
+    }
+
+    private static Dictionary<string, object>? MergeContext(
+        Dictionary<string, object>? properties,
+        SdkEventContext? context)
+    {
+        if (context is null) return properties;
+
+        var merged = properties is not null
+            ? new Dictionary<string, object>(properties)
+            : new Dictionary<string, object>();
+
+        if (context.Url is not null) merged["$url"] = context.Url;
+        if (context.Referrer is not null) merged["$referrer"] = context.Referrer;
+        if (context.Screen is not null)
+            merged["$screen"] = new { width = context.Screen.Width, height = context.Screen.Height };
+        if (context.Utm is not null)
+        {
+            if (context.Utm.Source is not null) merged["$utm_source"] = context.Utm.Source;
+            if (context.Utm.Medium is not null) merged["$utm_medium"] = context.Utm.Medium;
+            if (context.Utm.Campaign is not null) merged["$utm_campaign"] = context.Utm.Campaign;
+        }
+
+        return merged;
     }
 
     private RawEvent BuildRawEvent(

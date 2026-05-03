@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EventProcessor;
 
-public class EventRepository(EventProcessorDbContext dbContext) : IProcessedEventRepository
+public class EventRepository(EventProcessorDbContext dbContext, ILogger<EventRepository> logger) : IProcessedEventRepository
 {
     public Task<ProcessedEvent?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
@@ -14,14 +14,30 @@ public class EventRepository(EventProcessorDbContext dbContext) : IProcessedEven
 
     public async Task AddAsync(ProcessedEvent entity, CancellationToken cancellationToken = default)
     {
-        await dbContext.ProcessedEvents.AddAsync(entity, cancellationToken);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.ProcessedEvents.AddAsync(entity, cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "DB write failed for event {EventId} project {ProjectId}", entity.EventId, entity.ProjectId);
+            throw;
+        }
     }
 
     public async Task UpdateAsync(ProcessedEvent entity, CancellationToken cancellationToken = default)
     {
-        dbContext.ProcessedEvents.Update(entity);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            dbContext.ProcessedEvents.Update(entity);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "DB update failed for event {EventId}", entity.EventId);
+            throw;
+        }
     }
 
     public async Task DeleteAsync(ProcessedEvent entity, CancellationToken cancellationToken = default)

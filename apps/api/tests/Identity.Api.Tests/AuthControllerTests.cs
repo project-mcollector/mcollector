@@ -1,10 +1,8 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using Identity.Api.Api.Controllers;
-using Identity.Api.Infrastructure.Identity;
+using Identity.Api.Application.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
 using Moq;
+using Utilities;
 
 namespace Identity.Api.Tests;
 
@@ -13,67 +11,44 @@ public class AuthControllerTests
     [Fact]
     public async Task Login_InvalidCredentials_ReturnsUnauthorized()
     {
-        var userManager = TestHelpers.CreateUserManagerMock();
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Jwt:Secret"] = "unit-test-secret-key-unit-test-secret-key"
-            })
-            .Build();
+        var authService = new Mock<IAuthService>();
+        authService.Setup(x => x.LoginAsync("user@acme.dev", "bad-password"))
+            .ReturnsAsync(Errors.Unauthorized("user@acme.dev"));
 
-        var user = new ApplicationUser { Id = Guid.NewGuid().ToString(), Email = "user@acme.dev" };
-        userManager.Setup(x => x.FindByEmailAsync("user@acme.dev")).ReturnsAsync(user);
-        userManager.Setup(x => x.CheckPasswordAsync(user, "bad-password")).ReturnsAsync(false);
-
-        var controller = new AuthController(userManager.Object, configuration);
-
-        var result = await controller.Login(new()
-        {
-            Email = "user@acme.dev",
-            Password = "bad-password"
-        });
+        var controller = new AuthController(authService.Object);
+        var result = await controller.Login(new() { Email = "user@acme.dev", Password = "bad-password" });
 
         var unauthorized = Assert.IsType<UnauthorizedObjectResult>(result);
         Assert.Equal("Invalid credentials", unauthorized.Value);
     }
 
     [Fact]
-    public async Task Login_ValidCredentials_ReturnsJwtWithExpectedClaims()
+    public async Task Login_ValidCredentials_ReturnsJwt()
     {
-        var userManager = TestHelpers.CreateUserManagerMock();
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Jwt:Secret"] = "unit-test-secret-key-unit-test-secret-key"
-            })
-            .Build();
+        var token = new AuthTokenDto("test.jwt.token", 604800);
+        var authService = new Mock<IAuthService>();
+        authService.Setup(x => x.LoginAsync("user@acme.dev", "password123"))
+            .ReturnsAsync(token);
 
-        var user = new ApplicationUser
-        {
-            Id = Guid.NewGuid().ToString(),
-            Email = "user@acme.dev"
-        };
-
-        userManager.Setup(x => x.FindByEmailAsync(user.Email)).ReturnsAsync(user);
-        userManager.Setup(x => x.CheckPasswordAsync(user, "password123")).ReturnsAsync(true);
-
-        var controller = new AuthController(userManager.Object, configuration);
-
-        var result = await controller.Login(new()
-        {
-            Email = user.Email,
-            Password = "password123"
-        });
+        var controller = new AuthController(authService.Object);
+        var result = await controller.Login(new() { Email = "user@acme.dev", Password = "password123" });
 
         var ok = Assert.IsType<OkObjectResult>(result);
-        var response = Assert.IsType<LoginResponse>(ok.Value);
+        var response = Assert.IsType<AuthTokenDto>(ok.Value);
+        Assert.Equal("test.jwt.token", response.AccessToken);
+        Assert.Equal(604800, response.ExpiresIn);
+    }
 
-        Assert.False(string.IsNullOrWhiteSpace(response.AccessToken));
-        Assert.Equal(TimeSpan.FromDays(7).TotalSeconds, response.ExpiresIn);
+    [Fact]
+    public async Task Register_DuplicateEmail_ReturnsBadRequest()
+    {
+        var authService = new Mock<IAuthService>();
+        authService.Setup(x => x.RegisterAsync("dup@acme.dev", It.IsAny<string>()))
+            .ReturnsAsync(Errors.Validation("Registration", "Email already taken"));
 
-        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(response.AccessToken);
-        Assert.Contains(jwt.Claims, c => c.Type == ClaimTypes.NameIdentifier && c.Value == user.Id);
-        Assert.Contains(jwt.Claims, c => c.Type == ClaimTypes.Email && c.Value == user.Email);
-        Assert.True(jwt.ValidTo > DateTime.UtcNow.AddDays(6));
+        var controller = new AuthController(authService.Object);
+        var result = await controller.Register(new() { Email = "dup@acme.dev", Password = "Password1!" });
+
+        Assert.IsType<BadRequestObjectResult>(result);
     }
 }

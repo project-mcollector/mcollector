@@ -74,6 +74,26 @@
     background-color: #3f3f46;
 }
 
+.deleteButton {
+    background-color: white;
+    color: #b91c1c;
+    border: 1px solid #fca5a5;
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.deleteButton:hover {
+    background-color: #fff5f5;
+}
+
+.deleteButton:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
 /* Поле ввода */
 .input {
     width: 100%;
@@ -302,8 +322,13 @@
 
 /* Skeleton */
 @keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
+    0% {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
 }
 
 .skeletonCard {
@@ -352,7 +377,7 @@
     font-weight: 500;
     color: #18181b;
     cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 /* Навигация */

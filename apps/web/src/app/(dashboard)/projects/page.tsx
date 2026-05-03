@@ -29,6 +29,7 @@ export default function ProjectsPage() {
     null,
   );
   const [copied, setCopied] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -64,6 +65,27 @@ export default function ProjectsPage() {
     }
   }
 
+  async function deleteProject(id: string) {
+    if (deleting) return;
+    if (!confirm("Удалить проект? Это действие необратимо")) return;
+    setDeleting(id);
+    try {
+      const res = await authFetch(`${BASE_URL}/api/projects/${id}`, router, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setProjects(projects.filter((p) => p.id !== id));
+      } else {
+        const text = await res.text();
+        alert("Не удалось удалить проект: " + text);
+      }
+    } catch (e) {
+      alert("Не удалось удалить проект");
+    } finally {
+      setDeleting(null);
+    }
+  }
+
   function closeModal() {
     setCreatedProject(null);
     setCopied(false);
@@ -80,22 +102,27 @@ export default function ProjectsPage() {
     router.push("/login");
   }
 
-  if (loading) return (
-    <div className={styles.page}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>Мои проекты</h1>
+  if (loading)
+    return (
+      <div className={styles.page}>
+        <div className={styles.header}>
+          <h1 className={styles.title}>Мои проекты</h1>
+        </div>
+        <div className={styles.projectsGrid}>
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className={styles.skeletonCard} />
+          ))}
+        </div>
       </div>
-      <div className={styles.projectsGrid}>
-        {[...Array(3)].map((_, i) => <div key={i} className={styles.skeletonCard} />)}
-      </div>
-    </div>
-  );
+    );
 
   return (
     <div className={styles.page}>
       <div className={styles.header}>
         <h1 className={styles.title}>Мои проекты</h1>
-        <button className={styles.buttonOutline} onClick={logout}>Выйти</button>
+        <button className={styles.buttonOutline} onClick={logout}>
+          Выйти
+        </button>
       </div>
 
       {projects.length === 0 && (
@@ -111,7 +138,19 @@ export default function ProjectsPage() {
             style={{ cursor: "pointer" }}
           >
             <span className={styles.projectName}>{project.name}</span>
-            <span className={styles.projectArrow}>→</span>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <button
+                className={styles.deleteButton}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteProject(project.id);
+                }}
+                disabled={deleting === project.id}
+              >
+                {deleting === project.id ? "Удаление..." : "Удалить"}
+              </button>
+              <span className={styles.projectArrow}>→</span>
+            </div>
           </div>
         ))}
       </div>
@@ -127,7 +166,11 @@ export default function ProjectsPage() {
             onKeyDown={(e) => e.key === "Enter" && createProject()}
             className={styles.input}
           />
-          <button onClick={createProject} disabled={creating} className={styles.button}>
+          <button
+            onClick={createProject}
+            disabled={creating}
+            className={styles.button}
+          >
             {creating ? "Создание..." : "Создать"}
           </button>
         </div>

@@ -18,6 +18,7 @@ export default function LoginPage() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    document.title = "MCollector — Вход";
     if (localStorage.getItem("token")) {
       router.replace("/projects");
     } else {
@@ -47,6 +48,8 @@ export default function LoginPage() {
       const data = await res.json();
       localStorage.setItem("token", data.accessToken);
       router.push("/projects");
+    } catch {
+      setError("Не удалось подключиться к серверу");
     } finally {
       setLoading(false);
     }

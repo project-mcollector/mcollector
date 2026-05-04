@@ -7,6 +7,7 @@ import styles from "../login.module.css";
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_IDENTITY_URL || "http://localhost:5003";
+
 export default function RegisterPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -17,22 +18,39 @@ export default function RegisterPage() {
   const [organizationName, setOrganizationName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (localStorage.getItem("token")) router.replace("/projects");
-  }, [router]);
-
-  function validatePassword(pwd: string): string[] {
-    const errors = []
-    if (pwd.length < 6) errors.push('Не менее 6 символов')
-    if (!/[a-z]/.test(pwd)) errors.push('Строчная буква (a-z)')
-    if (!/[A-Z]/.test(pwd)) errors.push('Заглавная буква (A-Z)')
-    if (!/[^a-zA-Z0-9]/.test(pwd)) errors.push('Специальный символ (!@#$ и т.д.)')
-    return errors
-  }
-
+  const [ready, setReady] = useState(false);
   const [createdProject, setCreatedProject] = useState<{ id: string; apiKey: string } | null>(null);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    document.title = "MCollector — Регистрация";
+    if (localStorage.getItem("token")) {
+      router.replace("/projects");
+    } else {
+      setReady(true);
+    }
+  }, [router]);
+
+  if (!ready) return null;
+
+  function validatePassword(pwd: string): string[] {
+    const errors = [];
+    if (pwd.length < 6) errors.push("Не менее 6 символов");
+    if (!/[a-z]/.test(pwd)) errors.push("Строчная буква (a-z)");
+    if (!/[A-Z]/.test(pwd)) errors.push("Заглавная буква (A-Z)");
+    if (!/[^a-zA-Z0-9]/.test(pwd)) errors.push("Специальный символ (!@#$ и т.д.)");
+    return errors;
+  }
+
+  const passwordRequirements = [
+    { check: password.length >= 6, label: "Не менее 6 символов" },
+    { check: /[a-z]/.test(password), label: "Строчная буква (a-z)" },
+    { check: /[A-Z]/.test(password), label: "Заглавная буква (A-Z)" },
+    { check: /[^a-zA-Z0-9]/.test(password), label: "Специальный символ (!@#$)" },
+  ];
+
+  const passwordsMatch = confirmPassword.length > 0 && password === confirmPassword;
+  const passwordsMismatch = confirmPassword.length > 0 && password !== confirmPassword;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -43,10 +61,10 @@ export default function RegisterPage() {
       return;
     }
 
-    const passwordErrors = validatePassword(password)
+    const passwordErrors = validatePassword(password);
     if (passwordErrors.length > 0) {
-      setError('Пароль не соответствует требованиям')
-      return
+      setError("Пароль не соответствует требованиям");
+      return;
     }
 
     setLoading(true);
@@ -55,11 +73,7 @@ export default function RegisterPage() {
       const res = await fetch(`${BASE_URL}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          password,
-          organizationName,
-        }),
+        body: JSON.stringify({ email, password, organizationName }),
       });
 
       const data = await res.json();
@@ -82,8 +96,8 @@ export default function RegisterPage() {
 
       const project = await projectRes.json();
       setCreatedProject({ id: project.id, apiKey: project.apiKey });
-    } catch (e) {
-      setError(`Ошибка соединения с сервером ${e}`);
+    } catch {
+      setError("Не удалось подключиться к серверу");
     } finally {
       setLoading(false);
     }
@@ -142,28 +156,16 @@ export default function RegisterPage() {
               </button>
             </div>
             {password && (
-              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {[
-                  { check: password.length >= 6, label: 'Не менее 6 символов' },
-                  { check: /[a-z]/.test(password), label: 'Строчная буква (a-z)' },
-                  { check: /[A-Z]/.test(password), label: 'Заглавная буква (A-Z)' },
-                  { check: /[^a-zA-Z0-9]/.test(password), label: 'Специальный символ (!@#$)' },
-                ].map(({ check, label }) => (
-                  <div key={label} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    fontSize: 12,
-                    color: check ? '#16a34a' : '#a1a1aa'
-                  }}>
-                    <span style={{ fontSize: 14 }}>{check ? '✓' : '○'}</span>
+              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+                {passwordRequirements.map(({ check, label }) => (
+                  <div key={label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: check ? "#16a34a" : "#a1a1aa" }}>
+                    <span style={{ fontSize: 14 }}>{check ? "✓" : "○"}</span>
                     {label}
                   </div>
                 ))}
               </div>
             )}
           </div>
-
 
           <div>
             <label className={styles.label}>Подтвердите пароль</label>
@@ -184,6 +186,12 @@ export default function RegisterPage() {
                 )}
               </button>
             </div>
+            {confirmPassword && (
+              <div style={{ marginTop: 6, fontSize: 12, display: "flex", alignItems: "center", gap: 6, color: passwordsMatch ? "#16a34a" : "#dc2626" }}>
+                <span style={{ fontSize: 14 }}>{passwordsMatch ? "✓" : "○"}</span>
+                {passwordsMatch ? "Пароли совпадают" : passwordsMismatch ? "Пароли не совпадают" : ""}
+              </div>
+            )}
           </div>
 
           <button type="submit" disabled={loading} className={styles.button}>
@@ -204,7 +212,7 @@ export default function RegisterPage() {
           <div className={styles.modal}>
             <h2 className={styles.modalTitle}>Проект создан!</h2>
             <p className={styles.modalSubtitle}>
-              Сохраните ваш API-ключ — он понадобится для установки SDK на сайт
+              Сохраните ваш API-ключ — он понадобится для подключения SDK к сайту
             </p>
 
             <label className={styles.label}>Ваш API-ключ</label>
@@ -222,10 +230,11 @@ export default function RegisterPage() {
               </button>
             </div>
 
-            <label className={styles.label}>Добавьте на ваш сайт</label>
-            <div className={styles.codeBlock}>
-              {`<script>\n  analytics.init('${createdProject.apiKey}')\n</script>`}
-            </div>
+            <label className={styles.label}>Установка</label>
+            <div className={styles.codeBlock}>{`npm install @mcollector/sdk`}</div>
+
+            <label className={styles.label}>Инициализация</label>
+            <div className={styles.codeBlock}>{`import { analytics } from '@mcollector/sdk'\n\nanalytics.init('${createdProject.apiKey}')`}</div>
 
             <div className={styles.modalButtons}>
               <button

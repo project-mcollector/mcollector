@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "../dashboard.module.css";
 import { authFetch } from "@/lib/auth";
+import { copyToClipboard } from "@/lib/clipboard";
 import ConfirmModal from "@/components/ConfirmModal";
 
 type Project = {
@@ -47,8 +48,6 @@ export default function ProjectsPage() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
 
-  const [deleteConfirm, setDeleteConfirm] = useState<Project | null>(null);
-  const [deleting, setDeleting] = useState<string | null>(null);
 
   const [renameTarget, setRenameTarget] = useState<Project | null>(null);
   const [renameName, setRenameName] = useState("");
@@ -57,9 +56,11 @@ export default function ProjectsPage() {
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-  const [regenerateTarget, setRegenerateTarget] = useState<Project | null>(null);
+  const [apiKeyModal, setApiKeyModal] = useState<Project | null>(null);
+  const [apiKeyVisible, setApiKeyVisible] = useState(false);
+  const [apiKeyCopied, setApiKeyCopied] = useState(false);
+  const [apiKeyRegenerateConfirm, setApiKeyRegenerateConfirm] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
-  const [regeneratedKey, setRegeneratedKey] = useState<{ projectId: string; apiKey: string } | null>(null);
 
   const [search, setSearch] = useState("");
 
@@ -101,28 +102,6 @@ export default function ProjectsPage() {
     }
   }
 
-  async function confirmDelete() {
-    if (!deleteConfirm || deleting) return;
-    const id = deleteConfirm.id;
-    setDeleteConfirm(null);
-    setDeleting(id);
-    setError("");
-    try {
-      const res = await authFetch(`${BASE_URL}/api/projects/${id}`, router, {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        setProjects((prev) => prev.filter((p) => p.id !== id));
-      } else {
-        setError("Не удалось удалить проект");
-      }
-    } catch {
-      setError("Не удалось удалить проект");
-    } finally {
-      setDeleting(null);
-    }
-  }
-
   async function confirmRename() {
     if (!renameTarget || !renameName.trim() || renaming) return;
     setRenaming(true);
@@ -148,21 +127,20 @@ export default function ProjectsPage() {
     }
   }
 
-  async function confirmRegenerate() {
-    if (!regenerateTarget || regenerating) return;
+  async function doRegenerate() {
+    if (!apiKeyModal || regenerating) return;
     setRegenerating(true);
-    setError("");
-    const id = regenerateTarget.id;
-    setRegenerateTarget(null);
+    setApiKeyRegenerateConfirm(false);
     try {
-      const res = await authFetch(`${BASE_URL}/api/projects/${id}/api-key/regenerate`, router, {
+      const res = await authFetch(`${BASE_URL}/api/projects/${apiKeyModal.id}/api-key/regenerate`, router, {
         method: "POST",
       });
       if (res.ok) {
         const updated = await res.json();
-        setProjects((prev) => prev.map((p) => (p.id === id ? updated : p)));
-        setRegeneratedKey({ projectId: id, apiKey: updated.apiKey });
-        setVisibleKeys((prev) => new Set([...prev, id]));
+        setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+        setApiKeyModal(updated);
+        setApiKeyVisible(true);
+        setApiKeyCopied(false);
       } else {
         setError("Не удалось перегенерировать ключ");
       }
@@ -182,14 +160,14 @@ export default function ProjectsPage() {
     });
   }
 
-  function copyKey(id: string, key: string) {
-    navigator.clipboard.writeText(key);
+  async function copyKey(id: string, key: string) {
+    await copyToClipboard(key);
     setCopiedKey(id);
     setTimeout(() => setCopiedKey(null), 2000);
   }
 
-  function copyApiKey(key: string) {
-    navigator.clipboard.writeText(key);
+  async function copyApiKey(key: string) {
+    await copyToClipboard(key);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -197,7 +175,6 @@ export default function ProjectsPage() {
   function closeModal() {
     setCreatedProject(null);
     setCopied(false);
-    setRegeneratedKey(null);
   }
 
   function logout() {
@@ -232,7 +209,7 @@ export default function ProjectsPage() {
             <p className={styles.subtitle}>{projects.length} {projects.length === 1 ? "проект" : projects.length < 5 ? "проекта" : "проектов"}</p>
           )}
         </div>
-        <button className={styles.buttonOutline} onClick={logout}>
+        <button className={styles.deleteButtonOutline} onClick={logout}>
           Выйти
         </button>
       </div>
@@ -265,21 +242,31 @@ export default function ProjectsPage() {
         </div>
       ) : (
         <div className={styles.projectsGrid}>
+          {filteredProjects.length === 0 && (
+            <p className={styles.emptyState}>Ничего не найдено</p>
+          )}
           {filteredProjects.map((project) => (
             <div key={project.id} className={styles.projectCard}>
               <div
                 className={styles.projectCardMain}
                 onClick={() => router.push(`/projects/${project.id}/dashboard`)}
               >
-                <span className={styles.projectName}>{project.name}</span>
+                <div className={styles.projectNameRow}>
+                  <span className={styles.projectName}>{project.name}</span>
+                  <button
+                    className={styles.renameIcon}
+                    title="Переименовать"
+                    onClick={(e) => { e.stopPropagation(); setRenameTarget(project); setRenameName(project.name); }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  </button>
+                </div>
                 <span className={styles.projectArrow}>→</span>
               </div>
 
               <div className={styles.projectApiKeyRow}>
                 <span className={styles.apiKeyDisplay}>
-                  {visibleKeys.has(project.id)
-                    ? (regeneratedKey?.projectId === project.id ? regeneratedKey.apiKey : project.apiKey)
-                    : "proj_••••••••••••••••"}
+                  {visibleKeys.has(project.id) ? project.apiKey : "proj_••••••••••••••••"}
                 </span>
                 <div className={styles.apiKeyActions}>
                   <button
@@ -300,31 +287,16 @@ export default function ProjectsPage() {
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                     )}
                   </button>
+                  <button
+                    className={styles.iconButton}
+                    onClick={(e) => { e.stopPropagation(); setApiKeyModal(project); setApiKeyVisible(false); setApiKeyCopied(false); setApiKeyRegenerateConfirm(false); }}
+                    title="Управление API-ключом"
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.87"/></svg>
+                  </button>
                 </div>
               </div>
 
-              <div className={styles.projectCardActions}>
-                <button
-                  className={styles.buttonSmall}
-                  onClick={(e) => { e.stopPropagation(); setRenameTarget(project); setRenameName(project.name); }}
-                >
-                  Переименовать
-                </button>
-                <button
-                  className={styles.buttonSmall}
-                  onClick={(e) => { e.stopPropagation(); setRegenerateTarget(project); }}
-                  disabled={regenerating}
-                >
-                  Перегенерировать ключ
-                </button>
-                <button
-                  className={styles.deleteButton}
-                  onClick={(e) => { e.stopPropagation(); setDeleteConfirm(project); }}
-                  disabled={deleting === project.id}
-                >
-                  {deleting === project.id ? "Удаление..." : "Удалить"}
-                </button>
-              </div>
             </div>
           ))}
         </div>
@@ -352,19 +324,8 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      {deleteConfirm && (
-        <ConfirmModal
-          title="Удалить проект?"
-          message={`Проект "${deleteConfirm.name}" и все его данные будут удалены. Это действие необратимо.`}
-          confirmLabel="Удалить"
-          danger
-          onConfirm={confirmDelete}
-          onCancel={() => setDeleteConfirm(null)}
-        />
-      )}
-
       {renameTarget && (
-        <div className={styles.modalOverlay}>
+        <div className={styles.modalOverlay} onClick={() => setRenameTarget(null)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h2 className={styles.modalTitle}>Переименовать проект</h2>
             <label className={styles.label}>Новое название</label>
@@ -389,15 +350,74 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {regenerateTarget && (
-        <ConfirmModal
-          title="Перегенерировать API-ключ?"
-          message={`Старый ключ проекта "${regenerateTarget.name}" перестанет работать немедленно. Все интеграции, использующие его, сломаются до обновления.`}
-          confirmLabel="Перегенерировать"
-          danger
-          onConfirm={confirmRegenerate}
-          onCancel={() => setRegenerateTarget(null)}
-        />
+      {apiKeyModal && (
+        <div className={styles.modalOverlay} onClick={() => setApiKeyModal(null)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h2 className={styles.modalTitle}>API-ключ</h2>
+            <p className={styles.modalSubtitle}>{apiKeyModal.name}</p>
+
+            <label className={styles.label}>Текущий ключ</label>
+            <div className={styles.apiKeyBox}>
+              <span className={styles.apiKeyText}>
+                {apiKeyVisible ? apiKeyModal.apiKey : "proj_••••••••••••••••"}
+              </span>
+              <button
+                className={styles.iconButton}
+                onClick={() => setApiKeyVisible((v) => !v)}
+                title={apiKeyVisible ? "Скрыть" : "Показать"}
+              >
+                {apiKeyVisible ? <EyeOffIcon /> : <EyeIcon />}
+              </button>
+              <button
+                className={styles.buttonSmall}
+                onClick={async () => {
+                  await copyToClipboard(apiKeyModal.apiKey);
+                  setApiKeyCopied(true);
+                  setTimeout(() => setApiKeyCopied(false), 2000);
+                }}
+              >
+                {apiKeyCopied ? "Скопировано ✓" : "Скопировать"}
+              </button>
+            </div>
+
+            {!apiKeyRegenerateConfirm ? (
+              <button
+                className={styles.buttonOutline}
+                onClick={() => setApiKeyRegenerateConfirm(true)}
+                style={{ width: "100%", marginBottom: 16 }}
+              >
+                ↺ Перегенерировать ключ
+              </button>
+            ) : (
+              <div className={styles.regenerateConfirmBox}>
+                <p className={styles.regenerateWarning}>
+                  Старый ключ перестанет работать немедленно. Все интеграции, использующие его, сломаются до обновления.
+                </p>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    className={styles.dangerButton}
+                    onClick={doRegenerate}
+                    disabled={regenerating}
+                  >
+                    {regenerating ? "Генерация..." : "Да, перегенерировать"}
+                  </button>
+                  <button
+                    className={styles.buttonOutline}
+                    onClick={() => setApiKeyRegenerateConfirm(false)}
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className={styles.modalButtons}>
+              <button className={styles.buttonOutline} onClick={() => setApiKeyModal(null)} style={{ width: "100%" }}>
+                Закрыть
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {createdProject && (
@@ -440,30 +460,6 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {regeneratedKey && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modal}>
-            <h2 className={styles.modalTitle}>Новый API-ключ</h2>
-            <p className={styles.modalSubtitle}>
-              Сохраните ключ — это единственный раз, когда он отображается в явном виде после перегенерации.
-            </p>
-            <div className={styles.apiKeyBox}>
-              <span className={styles.apiKeyText}>{regeneratedKey.apiKey}</span>
-              <button
-                className={styles.buttonSmall}
-                onClick={() => copyApiKey(regeneratedKey.apiKey)}
-              >
-                {copied ? "Скопировано ✓" : "Скопировать"}
-              </button>
-            </div>
-            <div className={styles.modalButtons}>
-              <button className={styles.button} onClick={closeModal}>
-                Закрыть
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -70,8 +70,11 @@ export default function LoginPage() {
               type="email"
               placeholder="you@example.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => { setEmail(e.target.value); setError(""); }}
               required
+              autoFocus
+              autoComplete="email"
+              disabled={loading}
               className={styles.input}
             />
           </div>
@@ -83,8 +86,10 @@ export default function LoginPage() {
                 type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => { setPassword(e.target.value); setError(""); }}
                 required
+                autoComplete="current-password"
+                disabled={loading}
                 className={styles.input}
               />
               <button type="button" className={styles.passwordToggle} onClick={() => setShowPassword(v => !v)}>

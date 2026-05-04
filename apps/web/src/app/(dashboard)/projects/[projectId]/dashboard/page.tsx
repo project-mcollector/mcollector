@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import styles from "../../../dashboard.module.css";
 import { authFetch } from "@/lib/auth";
+import ConfirmModal from "@/components/ConfirmModal";
 
 const ANALYTICS_URL =
   process.env.NEXT_PUBLIC_ANALYTICS_URL || "http://localhost:5002";
@@ -79,6 +80,8 @@ export default function DashboardPage() {
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
   const [selectedEventTimeseries, setSelectedEventTimeseries] = useState<TimeseriesPoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -168,9 +171,19 @@ export default function DashboardPage() {
       .catch(() => {});
   }
 
-  function logout() {
-    localStorage.removeItem("token");
-    router.push("/login");
+  async function confirmDelete() {
+    setDeleting(true);
+    try {
+      const res = await authFetch(`${IDENTITY_URL}/api/projects/${projectId}`, router, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        router.push("/projects");
+      }
+    } catch {
+    } finally {
+      setDeleting(false);
+    }
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -182,14 +195,24 @@ export default function DashboardPage() {
   const tooltipLabelFormatter = (label: any) =>
     typeof label === "string" ? formatDate(label) : String(label ?? "");
 
+  const nav = (
+    <div className={styles.dashboardNav}>
+      <button className={styles.navBackBtn} onClick={() => router.push("/projects")}>
+        ← Проекты
+      </button>
+      {project && (
+        <>
+          <span className={styles.navSeparator}>/</span>
+          <span className={styles.navCurrent}>{project.name}</span>
+        </>
+      )}
+    </div>
+  );
+
   if (loading)
     return (
       <div className={styles.page}>
-        <div className={styles.dashboardNav}>
-          <button className={styles.navBackBtn} onClick={() => router.push("/projects")}>
-            ← Проекты
-          </button>
-        </div>
+        {nav}
         <div className={styles.statsGrid}>
           {[...Array(3)].map((_, i) => (
             <div key={i} className={styles.skeletonCard} />
@@ -203,24 +226,14 @@ export default function DashboardPage() {
   if (!overview)
     return (
       <div className={styles.page}>
-        <div className={styles.dashboardNav}>
-          <button className={styles.navBackBtn} onClick={() => router.push("/projects")}>
-            ← Проекты
-          </button>
-        </div>
+        {nav}
         <p className={styles.emptyState}>Нет данных за выбранный период</p>
       </div>
     );
 
   return (
     <div className={styles.page}>
-      <div className={styles.dashboardNav}>
-        <button className={styles.navBackBtn} onClick={() => router.push("/projects")}>
-          ← Проекты
-        </button>
-        <span className={styles.navSeparator}>/</span>
-        <span className={styles.navCurrent}>{project?.name ?? "..."}</span>
-      </div>
+      {nav}
 
       <div className={styles.header}>
         <div>
@@ -252,8 +265,12 @@ export default function DashboardPage() {
             ↻ Обновить
           </button>
 
-          <button className={styles.buttonOutline} onClick={logout}>
-            Выйти
+          <button
+            className={styles.deleteLink}
+            onClick={() => setDeleteConfirm(true)}
+            disabled={deleting}
+          >
+            Удалить проект
           </button>
         </div>
       </div>
@@ -281,7 +298,7 @@ export default function DashboardPage() {
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={eventsTimeseries}>
               <XAxis dataKey="timestamp" tickFormatter={formatDate} />
-              <YAxis />
+              <YAxis allowDecimals={false} />
               <Tooltip formatter={tooltipFormatter} labelFormatter={tooltipLabelFormatter} />
               <Line type="monotone" dataKey="count" name="События" stroke="#8884d8" dot={false} />
             </LineChart>
@@ -290,7 +307,7 @@ export default function DashboardPage() {
       </div>
 
       <div className={styles.chartSection}>
-        <h2 className={styles.chartTitle}>События</h2>
+        <h2 className={styles.chartTitle}>Топ событий</h2>
         {eventCounts.length === 0 ? (
           <p className={styles.chartEmpty}>Нет данных</p>
         ) : (
@@ -324,7 +341,7 @@ export default function DashboardPage() {
                         <ResponsiveContainer width="100%" height={200}>
                           <LineChart data={selectedEventTimeseries}>
                             <XAxis dataKey="timestamp" tickFormatter={formatDate} />
-                            <YAxis />
+                            <YAxis allowDecimals={false} />
                             <Tooltip formatter={tooltipFormatter} labelFormatter={tooltipLabelFormatter} />
                             <Line type="monotone" dataKey="count" name={event.name} stroke="#8884d8" dot={false} />
                           </LineChart>
@@ -347,13 +364,24 @@ export default function DashboardPage() {
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={usersTimeseries}>
               <XAxis dataKey="timestamp" tickFormatter={formatDate} />
-              <YAxis />
+              <YAxis allowDecimals={false} />
               <Tooltip formatter={tooltipFormatter} labelFormatter={tooltipLabelFormatter} />
               <Line type="monotone" dataKey="count" name="Пользователи" stroke="#82ca9d" dot={false} />
             </LineChart>
           </ResponsiveContainer>
         )}
       </div>
+
+      {deleteConfirm && (
+        <ConfirmModal
+          title="Удалить проект?"
+          message={`Проект "${project?.name}" и все его данные будут удалены. Это действие необратимо.`}
+          confirmLabel={deleting ? "Удаление..." : "Удалить"}
+          danger
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteConfirm(false)}
+        />
+      )}
     </div>
   );
 }

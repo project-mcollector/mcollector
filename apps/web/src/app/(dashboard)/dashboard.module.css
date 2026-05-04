@@ -94,6 +94,51 @@
     cursor: default;
 }
 
+.deleteLink {
+    background: none;
+    border: none;
+    color: #b91c1c;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 4px 0;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    font-family: inherit;
+    opacity: 0.7;
+    transition: opacity 0.15s;
+}
+
+.deleteLink:hover {
+    opacity: 1;
+}
+
+.deleteLink:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.deleteButtonOutline {
+    background-color: white;
+    color: #b91c1c;
+    border: 1px solid #fca5a5;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.deleteButtonOutline:hover {
+    background-color: #fff5f5;
+}
+
+.deleteButtonOutline:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
 /* Поле ввода */
 .input {
     width: 100%;
@@ -477,6 +522,34 @@
     cursor: pointer;
 }
 
+.projectNameRow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.renameIcon {
+    background: none;
+    border: none;
+    padding: 3px;
+    cursor: pointer;
+    color: #d4d4d8;
+    display: flex;
+    align-items: center;
+    border-radius: 4px;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s;
+}
+
+.projectCard:hover .renameIcon {
+    opacity: 1;
+}
+
+.renameIcon:hover {
+    color: #18181b;
+    background: #f4f4f5;
+}
+
 .projectApiKeyRow {
     display: flex;
     align-items: center;
@@ -527,6 +600,44 @@
     padding: 10px 24px;
     border-top: 1px solid #f4f4f5;
     flex-wrap: wrap;
+}
+
+/* Regenerate inline confirm */
+.regenerateConfirmBox {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+}
+
+.regenerateWarning {
+    font-size: 13px;
+    color: #b91c1c;
+    margin: 0 0 12px 0;
+    line-height: 1.5;
+}
+
+.dangerButton {
+    background: #dc2626;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.15s;
+    white-space: nowrap;
+}
+
+.dangerButton:hover {
+    background: #b91c1c;
+}
+
+.dangerButton:disabled {
+    opacity: 0.6;
+    cursor: default;
 }
 
 /* Chart empty state */

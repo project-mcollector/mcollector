@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "../login.module.css";
+import { copyToClipboard } from "@/lib/clipboard";
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_IDENTITY_URL || "http://localhost:5003";
@@ -120,6 +121,9 @@ export default function RegisterPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoFocus
+              autoComplete="email"
+              disabled={loading}
               className={styles.input}
             />
           </div>
@@ -132,6 +136,8 @@ export default function RegisterPage() {
               value={organizationName}
               onChange={(e) => setOrganizationName(e.target.value)}
               required
+              autoComplete="organization"
+              disabled={loading}
               className={styles.input}
             />
           </div>
@@ -145,6 +151,8 @@ export default function RegisterPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                autoComplete="new-password"
+                disabled={loading}
                 className={styles.input}
               />
               <button type="button" className={styles.passwordToggle} onClick={() => setShowPassword(v => !v)}>
@@ -176,6 +184,8 @@ export default function RegisterPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
+                autoComplete="new-password"
+                disabled={loading}
                 className={styles.input}
               />
               <button type="button" className={styles.passwordToggle} onClick={() => setShowConfirmPassword(v => !v)}>
@@ -220,8 +230,8 @@ export default function RegisterPage() {
               <span className={styles.apiKeyText}>{createdProject.apiKey}</span>
               <button
                 className={styles.buttonSmall}
-                onClick={() => {
-                  navigator.clipboard.writeText(createdProject.apiKey);
+                onClick={async () => {
+                  await copyToClipboard(createdProject.apiKey);
                   setCopied(true);
                   setTimeout(() => setCopied(false), 2000);
                 }}

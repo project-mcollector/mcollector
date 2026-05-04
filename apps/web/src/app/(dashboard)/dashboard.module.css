@@ -541,7 +541,8 @@
     transition: opacity 0.15s, color 0.15s;
 }
 
-.projectCard:hover .renameIcon {
+.projectCard:hover .renameIcon,
+.projectNameRow:hover .renameIcon {
     opacity: 1;
 }
 

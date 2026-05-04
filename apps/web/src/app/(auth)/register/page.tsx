@@ -36,7 +36,7 @@ export default function RegisterPage() {
 
   function validatePassword(pwd: string): string[] {
     const errors = [];
-    if (pwd.length < 6) errors.push("Не менее 6 символов");
+    if (pwd.length < 8) errors.push("Не менее 8 символов");
     if (!/[a-z]/.test(pwd)) errors.push("Строчная буква (a-z)");
     if (!/[A-Z]/.test(pwd)) errors.push("Заглавная буква (A-Z)");
     if (!/[^a-zA-Z0-9]/.test(pwd)) errors.push("Специальный символ (!@#$ и т.д.)");
@@ -44,7 +44,7 @@ export default function RegisterPage() {
   }
 
   const passwordRequirements = [
-    { check: password.length >= 6, label: "Не менее 6 символов" },
+    { check: password.length >= 8, label: "Не менее 8 символов" },
     { check: /[a-z]/.test(password), label: "Строчная буква (a-z)" },
     { check: /[A-Z]/.test(password), label: "Заглавная буква (A-Z)" },
     { check: /[^a-zA-Z0-9]/.test(password), label: "Специальный символ (!@#$)" },

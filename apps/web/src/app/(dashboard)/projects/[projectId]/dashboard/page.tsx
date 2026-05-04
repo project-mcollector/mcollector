@@ -82,6 +82,9 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameName, setRenameName] = useState("");
+  const [renaming, setRenaming] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -171,6 +174,27 @@ export default function DashboardPage() {
       .catch(() => {});
   }
 
+  async function confirmRename() {
+    if (!renameName.trim() || renaming) return;
+    setRenaming(true);
+    try {
+      const res = await authFetch(`${IDENTITY_URL}/api/projects/${projectId}`, router, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: renameName.trim(), description: "" }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setProject(updated);
+        document.title = `MCollector — ${updated.name}`;
+        setRenameOpen(false);
+      }
+    } catch {
+    } finally {
+      setRenaming(false);
+    }
+  }
+
   async function confirmDelete() {
     setDeleting(true);
     try {
@@ -237,7 +261,18 @@ export default function DashboardPage() {
 
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>{project?.name ?? "Дашборд"}</h1>
+          <div className={styles.projectNameRow}>
+            <h1 className={styles.title}>{project?.name ?? "Дашборд"}</h1>
+            {project && (
+              <button
+                className={styles.renameIcon}
+                title="Переименовать"
+                onClick={() => { setRenameName(project.name); setRenameOpen(true); }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
+            )}
+          </div>
           {lastUpdated && (
             <p className={styles.subtitle}>
               Обновлено в {lastUpdated.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
@@ -266,7 +301,7 @@ export default function DashboardPage() {
           </button>
 
           <button
-            className={styles.deleteLink}
+            className={styles.deleteButtonOutline}
             onClick={() => setDeleteConfirm(true)}
             disabled={deleting}
           >
@@ -371,6 +406,32 @@ export default function DashboardPage() {
           </ResponsiveContainer>
         )}
       </div>
+
+      {renameOpen && (
+        <div className={styles.modalOverlay} onClick={() => setRenameOpen(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h2 className={styles.modalTitle}>Переименовать проект</h2>
+            <label className={styles.label}>Новое название</label>
+            <input
+              type="text"
+              value={renameName}
+              onChange={(e) => setRenameName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && confirmRename()}
+              className={styles.input}
+              autoFocus
+              style={{ marginBottom: 20 }}
+            />
+            <div className={styles.modalButtons}>
+              <button className={styles.button} onClick={confirmRename} disabled={renaming || !renameName.trim()}>
+                {renaming ? "Сохранение..." : "Сохранить"}
+              </button>
+              <button className={styles.buttonOutline} onClick={() => setRenameOpen(false)}>
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {deleteConfirm && (
         <ConfirmModal

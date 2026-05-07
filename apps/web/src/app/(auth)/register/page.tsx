@@ -5,9 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "../login.module.css";
 import { copyToClipboard } from "@/lib/clipboard";
-
-const BASE_URL =
-  process.env.NEXT_PUBLIC_IDENTITY_URL || "http://localhost:5003";
+import { BASE_URL } from "@/lib/constants";
 
 export default function RegisterPage() {
   const router = useRouter();

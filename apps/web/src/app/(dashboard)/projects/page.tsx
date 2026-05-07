@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import styles from "../dashboard.module.css";
 import { authFetch } from "@/lib/auth";
 import { copyToClipboard } from "@/lib/clipboard";
-import ConfirmModal from "@/components/ConfirmModal";
+import { BASE_URL } from "@/lib/constants";
 
 type Project = {
   id: string;
@@ -18,9 +18,6 @@ type CreatedProject = {
   name: string;
   apiKey: string;
 };
-
-const BASE_URL =
-  process.env.NEXT_PUBLIC_IDENTITY_URL || "http://localhost:5003";
 
 const EyeIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

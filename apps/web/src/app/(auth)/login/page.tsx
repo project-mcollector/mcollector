@@ -3,10 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { BASE_URL } from "@/lib/constants";
 import styles from "../login.module.css";
-
-const BASE_URL =
-  process.env.NEXT_PUBLIC_IDENTITY_URL || "http://localhost:5003";
 
 export default function LoginPage() {
   const router = useRouter();

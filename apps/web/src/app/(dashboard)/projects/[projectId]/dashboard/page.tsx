@@ -12,15 +12,11 @@ import {
 } from "recharts";
 import styles from "../../../dashboard.module.css";
 import { authFetch } from "@/lib/auth";
+import { BASE_URL } from "@/lib/constants";
 import ConfirmModal from "@/components/ConfirmModal";
 
-const ANALYTICS_URL =
-  process.env.NEXT_PUBLIC_ANALYTICS_URL || "http://localhost:5002";
-const IDENTITY_URL =
-  process.env.NEXT_PUBLIC_IDENTITY_URL || "http://localhost:5003";
-
 function analyticsBase(projectId: string) {
-  return `${ANALYTICS_URL}/api/v1/projects/${projectId}/analytics`;
+  return `${BASE_URL}/api/v1/projects/${projectId}/analytics`;
 }
 
 function getDateRange(days: number) {
@@ -94,7 +90,7 @@ export default function DashboardPage() {
   }, [router]);
 
   useEffect(() => {
-    authFetch(`${IDENTITY_URL}/api/projects/${projectId}`, router)
+    authFetch(`${BASE_URL}/api/projects/${projectId}`, router)
       .then((r) => r.json())
       .then((data) => {
         setProject(data);
@@ -178,7 +174,7 @@ export default function DashboardPage() {
     if (!renameName.trim() || renaming) return;
     setRenaming(true);
     try {
-      const res = await authFetch(`${IDENTITY_URL}/api/projects/${projectId}`, router, {
+      const res = await authFetch(`${BASE_URL}/api/projects/${projectId}`, router, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: renameName.trim(), description: "" }),
@@ -198,7 +194,7 @@ export default function DashboardPage() {
   async function confirmDelete() {
     setDeleting(true);
     try {
-      const res = await authFetch(`${IDENTITY_URL}/api/projects/${projectId}`, router, {
+      const res = await authFetch(`${BASE_URL}/api/projects/${projectId}`, router, {
         method: "DELETE",
       });
       if (res.ok) {

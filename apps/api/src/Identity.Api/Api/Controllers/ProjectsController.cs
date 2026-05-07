@@ -21,13 +21,17 @@ public class ProjectsController(IProjectsService projectsService) : ControllerBa
     }
 
     [HttpPost]
-    [ProducesResponseType(typeof(ProjectDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProjectDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> CreateProject([FromBody] CreateProjectRequest request)
     {
         var result =
             await projectsService.CreateProjectAsync(UserId, request.Name, request.Description ?? string.Empty);
-        return result.IsSuccess ? Ok(result.Value) : MapError(result);
+        var project = result.Value ??
+                      throw new InvalidOperationException("CreateProjectAsync returned success but no project");
+        return result.IsSuccess
+            ? CreatedAtAction(nameof(GetProject), new { id = project.Id }, project)
+            : MapError(result);
     }
 
     [HttpGet("{id:guid}")]

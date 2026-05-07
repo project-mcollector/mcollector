@@ -26,11 +26,13 @@ public class AuthService(
         var user = await userManager.FindByEmailAsync(email);
         if (user is null || !await userManager.CheckPasswordAsync(user, password))
         {
-            logger.LogWarning("Failed login attempt for {Email}", email);
+            if (logger.IsEnabled(LogLevel.Warning))
+                logger.LogWarning("Failed login attempt for {Email}", email);
             return Errors.Unauthorized(email);
         }
 
-        logger.LogInformation("User {UserId} logged in", user.Id);
+        if (logger.IsEnabled(LogLevel.Information))
+            logger.LogInformation("User {UserId} logged in", user.Id);
         return BuildToken(user);
     }
 
@@ -42,24 +44,26 @@ public class AuthService(
         if (!result.Succeeded)
         {
             var errors = string.Join("; ", result.Errors.Select(e => e.Description));
-            logger.LogWarning("Registration failed for {Email}: {Errors}", email, errors);
+            if (logger.IsEnabled(LogLevel.Warning))
+                logger.LogWarning("Registration failed for {Email}: {Errors}", email, errors);
             return Errors.Validation("Registration", errors);
         }
 
-        logger.LogInformation("User {UserId} registered with email {Email}", user.Id, email);
+        if (logger.IsEnabled(LogLevel.Information))
+            logger.LogInformation("User {UserId} registered with email {Email}", user.Id, email);
         return BuildToken(user);
     }
 
     private AuthTokenDto BuildToken(ApplicationUser user)
     {
         var secret = configuration["Jwt:Secret"]
-            ?? throw new InvalidOperationException("Jwt:Secret is not configured");
+                     ?? throw new InvalidOperationException("Jwt:Secret is not configured");
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, user.Id),
-            new(ClaimTypes.Email, user.Email ?? string.Empty),
+            new(ClaimTypes.Email, user.Email ?? string.Empty)
         };
 
         var token = new JwtSecurityToken(

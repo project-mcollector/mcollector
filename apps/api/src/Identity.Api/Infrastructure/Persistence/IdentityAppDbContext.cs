@@ -4,7 +4,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Identity.Api.Infrastructure.Persistence;
 
-public class IdentityAppDbContext(DbContextOptions<IdentityAppDbContext> options) : IdentityDbContext<ApplicationUser>(options)
+public class IdentityAppDbContext(DbContextOptions<IdentityAppDbContext> options)
+    : IdentityDbContext<ApplicationUser>(options)
 {
     public DbSet<Project> Projects { get; set; }
 
@@ -17,12 +18,12 @@ public class IdentityAppDbContext(DbContextOptions<IdentityAppDbContext> options
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
             entity.Property(e => e.Description).HasMaxLength(500);
-            entity.Property(e => e.ApiKey).IsRequired();
+            entity.Property(e => e.ApiKey).IsRequired().HasMaxLength(100);
             entity.HasIndex(e => e.ApiKey).IsUnique();
 
             entity.HasMany(e => e.Users)
-                  .WithMany(e => e.Projects)
-                  .UsingEntity("UserProjects");
+                .WithMany(e => e.Projects)
+                .UsingEntity("UserProjects");
         });
     }
 }

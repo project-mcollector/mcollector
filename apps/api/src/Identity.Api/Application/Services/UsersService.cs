@@ -5,6 +5,7 @@ using Utilities;
 namespace Identity.Api.Application.Services;
 
 public record UserProfileDto(string Id, string? Email, string? UserName, List<UserProjectDto> Projects);
+
 public record UserProjectDto(Guid Id, string Name, string Description);
 
 public interface IUsersService

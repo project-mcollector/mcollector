@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace Identity.Api.Domain.Entities;
 
 public class Project
@@ -10,6 +8,6 @@ public class Project
     public string ApiKey { get; set; } = string.Empty;
 
     // Navigation property for users that have access to this project
-    public virtual ICollection<ApplicationUser> Users { get; set; } = [];
+    public virtual ICollection<ApplicationUser> Users { get; init; } = [];
 }
 

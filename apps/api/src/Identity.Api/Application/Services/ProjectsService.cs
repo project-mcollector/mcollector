@@ -7,7 +7,14 @@ using Utilities;
 namespace Identity.Api.Application.Services;
 
 public record ProjectDto(Guid Id, string Name, string Description, string ApiKey);
-public record ProjectWithMembersDto(Guid Id, string Name, string Description, string ApiKey, List<ProjectMemberDto> Members);
+
+public record ProjectWithMembersDto(
+    Guid Id,
+    string Name,
+    string Description,
+    string ApiKey,
+    List<ProjectMemberDto> Members);
+
 public record ProjectMemberDto(string Id, string Email);
 
 public interface IProjectsService
@@ -29,14 +36,10 @@ public class ProjectsService(
     ILogger<ProjectsService> logger) : IProjectsService
 {
     public async Task<Result<List<ProjectDto>>> GetProjectsAsync(string userId)
-    {
-        var projects = await dbContext.Projects
+        => await dbContext.Projects
             .Where(p => p.Users.Any(u => u.Id == userId))
             .Select(p => new ProjectDto(p.Id, p.Name, p.Description, p.ApiKey))
             .ToListAsync();
-
-        return projects;
-    }
 
     public async Task<Result<ProjectDto>> CreateProjectAsync(string userId, string name, string description)
     {
@@ -54,7 +57,9 @@ public class ProjectsService(
         dbContext.Projects.Add(project);
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("Project {ProjectId} '{Name}' created by user {UserId}", project.Id, project.Name, userId);
+        if (logger.IsEnabled(LogLevel.Information))
+            logger.LogInformation("Project {ProjectId} '{Name}' created by user {UserId}", project.Id, project.Name,
+                userId);
         return new ProjectDto(project.Id, project.Name, project.Description, project.ApiKey);
     }
 
@@ -62,7 +67,7 @@ public class ProjectsService(
     {
         var project = await FindProjectAsync(id, userId);
         if (project is null) return Errors.NotFound("Project", id);
-        return ToWithMembersDto(project);
+        return ToProjectWithMembersDto(project);
     }
 
     public async Task<Result<ProjectDto>> UpdateProjectAsync(Guid id, string userId, string name, string description)
@@ -74,7 +79,8 @@ public class ProjectsService(
         project.Description = description;
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("Project {ProjectId} updated by user {UserId}", id, userId);
+        if (logger.IsEnabled(LogLevel.Information))
+            logger.LogInformation("Project {ProjectId} updated by user {UserId}", id, userId);
         return new ProjectDto(project.Id, project.Name, project.Description, project.ApiKey);
     }
 
@@ -86,7 +92,8 @@ public class ProjectsService(
         dbContext.Projects.Remove(project);
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("Project {ProjectId} deleted by user {UserId}", id, userId);
+        if (logger.IsEnabled(LogLevel.Information))
+            logger.LogInformation("Project {ProjectId} deleted by user {UserId}", id, userId);
         return Result.Success();
     }
 
@@ -98,7 +105,8 @@ public class ProjectsService(
         project.ApiKey = apiKeyService.GenerateApiKey();
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("API key regenerated for project {ProjectId} by user {UserId}", id, userId);
+        if (logger.IsEnabled(LogLevel.Information))
+            logger.LogInformation("API key regenerated for project {ProjectId} by user {UserId}", id, userId);
         return new ProjectDto(project.Id, project.Name, project.Description, project.ApiKey);
     }
 
@@ -110,20 +118,28 @@ public class ProjectsService(
         var userToAdd = await userManager.FindByEmailAsync(memberEmail);
         if (userToAdd is null)
         {
-            logger.LogWarning("AddMember: no user found with email {MemberEmail} for project {ProjectId}", memberEmail, id);
+            if (logger.IsEnabled(LogLevel.Warning))
+                logger.LogWarning("AddMember: no user found with email {MemberEmail} for project {ProjectId}",
+                    memberEmail,
+                    id);
             return Errors.Validation("Email", $"No user found with email '{memberEmail}'");
         }
 
         if (project.Users.Any(u => u.Id == userToAdd.Id))
         {
-            logger.LogWarning("AddMember: user {MemberId} is already a member of project {ProjectId}", userToAdd.Id, id);
+            if (logger.IsEnabled(LogLevel.Warning))
+                logger.LogWarning("AddMember: user {MemberId} is already a member of project {ProjectId}", userToAdd.Id,
+                    id);
             return Errors.Conflict("User is already a member of this project");
         }
 
         project.Users.Add(userToAdd);
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("User {MemberId} ({MemberEmail}) added to project {ProjectId} by {UserId}", userToAdd.Id, memberEmail, id, userId);
+        if (logger.IsEnabled(LogLevel.Information))
+            logger.LogInformation("User {MemberId} ({MemberEmail}) added to project {ProjectId} by {UserId}",
+                userToAdd.Id,
+                memberEmail, id, userId);
         return Result.Success();
     }
 
@@ -139,7 +155,9 @@ public class ProjectsService(
         project.Users.Remove(userToRemove);
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("Member {MemberId} removed from project {ProjectId} by user {UserId}", memberId, id, userId);
+        if (logger.IsEnabled(LogLevel.Information))
+            logger.LogInformation("Member {MemberId} removed from project {ProjectId} by user {UserId}", memberId, id,
+                userId);
         return Result.Success();
     }
 
@@ -148,7 +166,7 @@ public class ProjectsService(
             .Include(p => p.Users)
             .FirstOrDefaultAsync(p => p.Id == projectId && p.Users.Any(u => u.Id == userId));
 
-    private static ProjectWithMembersDto ToWithMembersDto(Project project) =>
+    private static ProjectWithMembersDto ToProjectWithMembersDto(Project project) =>
         new(project.Id, project.Name, project.Description, project.ApiKey,
             project.Users.Select(u => new ProjectMemberDto(u.Id, u.Email ?? string.Empty)).ToList());
 }

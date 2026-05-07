@@ -17,12 +17,12 @@ public class AuthController(IAuthService authService) : ControllerBase
     }
 
     [HttpPost("register")]
-    [ProducesResponseType(typeof(AuthTokenDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(AuthTokenDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
         var result = await authService.RegisterAsync(request.Email, request.Password);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Error?.Description);
+        return result.IsSuccess ? Created("/api/users/me", result.Value) : BadRequest(result.Error?.Description);
     }
 }
 

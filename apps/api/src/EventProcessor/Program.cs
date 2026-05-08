@@ -17,4 +17,11 @@ builder.Services.AddScoped<IProcessedEventRepository, EventRepository>();
 builder.Services.AddScoped<IEventConsumer<RawEvent>, EventProcessorService>();
 
 var host = builder.Build();
+
+using (var scope = host.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<EventProcessorDbContext>();
+    dbContext.Database.Migrate();
+}
+
 host.Run();

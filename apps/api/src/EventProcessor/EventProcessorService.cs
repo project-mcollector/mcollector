@@ -1,6 +1,8 @@
+using System.Data.Common;
 using System.Diagnostics;
 using Contracts.Messages;
 using Infrastructure.Messaging;
+using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using EventProcessor.Contracts;
@@ -33,13 +35,6 @@ public class EventProcessorService : IEventConsumer<RawEvent>
             return;
         }
 
-        var isDuplicate = await repository.ExistsByEventIdAsync(message.EventId, cancellationToken);
-        if (isDuplicate)
-        {
-            logger.LogWarning("Duplicate event {EventId} for project {ProjectId} — skipping", message.EventId, message.ProjectId);
-            return;
-        }
-
         var processedEvent = new ProcessedEvent
         {
             EventId = message.EventId,
@@ -55,11 +50,27 @@ public class EventProcessorService : IEventConsumer<RawEvent>
         };
 
         var sw = Stopwatch.StartNew();
-        await repository.AddAsync(processedEvent, cancellationToken);
+        try
+        {
+            await repository.AddAsync(processedEvent, cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        {
+            logger.LogWarning("Duplicate event {EventId} for project {ProjectId} — skipping", message.EventId, message.ProjectId);
+            return;
+        }
         sw.Stop();
 
         logger.LogInformation(
             "DB write: event {EventId} '{EventName}' for project {ProjectId} in {ElapsedMs}ms",
             message.EventId, message.EventName, message.ProjectId, sw.ElapsedMilliseconds);
+    }
+
+    private static bool IsUniqueViolation(DbUpdateException ex)
+    {
+        return ex.InnerException is DbException dbEx
+            && (dbEx.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase)
+                || dbEx.Message.Contains("unique", StringComparison.OrdinalIgnoreCase)
+                || dbEx.Message.Contains("23505"));
     }
 }

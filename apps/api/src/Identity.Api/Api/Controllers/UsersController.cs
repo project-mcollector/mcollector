@@ -16,7 +16,8 @@ public class UsersController(IUsersService usersService) : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetCurrentUser()
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? throw new UnauthorizedAccessException();
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId)) return Unauthorized();
         var result = await usersService.GetCurrentUserAsync(userId);
         return result.IsSuccess ? Ok(result.Value) : NotFound();
     }

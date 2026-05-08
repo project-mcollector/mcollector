@@ -34,19 +34,26 @@ public class Worker(
 
                     if (consumeResult?.Message != null)
                     {
-                        logger.LogInformation("Received message: {Message}", consumeResult.Message.Value);
-
-                        var rawEvent = JsonSerializer.Deserialize<RawEvent>(consumeResult.Message.Value, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-                        if (rawEvent != null)
+                        try
                         {
-                            using var scope = serviceProvider.CreateScope();
-                            var processor = scope.ServiceProvider.GetRequiredService<IEventConsumer<RawEvent>>();
+                            logger.LogInformation("Received message: {Message}", consumeResult.Message.Value);
 
-                            await processor.ConsumeAsync(rawEvent, stoppingToken);
+                            var rawEvent = JsonSerializer.Deserialize<RawEvent>(consumeResult.Message.Value, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                            if (rawEvent != null)
+                            {
+                                using var scope = serviceProvider.CreateScope();
+                                var processor = scope.ServiceProvider.GetRequiredService<IEventConsumer<RawEvent>>();
+
+                                await processor.ConsumeAsync(rawEvent, stoppingToken);
+                            }
+
+                            consumer.Commit(consumeResult);
                         }
-
-                        consumer.Commit(consumeResult);
+                        catch (Exception ex)
+                        {
+                            logger.LogError(ex, "Error processing message — NOT committing offset, message will be re-processed");
+                        }
                     }
                 }
                 catch (OperationCanceledException)

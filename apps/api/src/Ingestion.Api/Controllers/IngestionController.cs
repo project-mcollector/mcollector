@@ -41,9 +41,12 @@ public class IngestionController(
     [HttpPost("batch")]
     public async Task<IActionResult> IngestBatch(
         [FromHeader(Name = "X-Project-Id")] Guid projectId,
-        [FromBody] List<IngestEventRequest> requests,
+        [FromBody] List<IngestEventRequest>? requests,
         CancellationToken cancellationToken)
     {
+        if (requests is null || requests.Count == 0)
+            return BadRequest(new { error = "Request body must contain a non-empty array of events" });
+
         if (requests.Count > 50)
             return BadRequest(new { error = "Batch size cannot exceed 50 events" });
 

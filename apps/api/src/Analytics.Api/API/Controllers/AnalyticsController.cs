@@ -110,19 +110,36 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
         if (!string.IsNullOrEmpty(eventName))
             query = query.Where(e => e.EventName == eventName);
 
-        var data = await query.ToListAsync();
-        Func<DateTimeOffset, DateTime> groupSelector = interval.ToLower() switch
+        var timeseries = interval.ToLower() switch
         {
-            "hour" => dt => new(dt.Year, dt.Month, dt.Day, dt.Hour, 0, 0),
-            "month" => dt => new(dt.Year, dt.Month, 1),
-            _ => dt => new(dt.Year, dt.Month, dt.Day)
+            "hour" => await query
+                .GroupBy(e => new { e.Timestamp.Year, e.Timestamp.Month, e.Timestamp.Day, e.Timestamp.Hour })
+                .Select(g => new
+                {
+                    timestamp = new DateTime(g.Key.Year, g.Key.Month, g.Key.Day, g.Key.Hour, 0, 0),
+                    count = g.Count()
+                })
+                .OrderBy(x => x.timestamp)
+                .ToListAsync(),
+            "month" => await query
+                .GroupBy(e => new { e.Timestamp.Year, e.Timestamp.Month })
+                .Select(g => new
+                {
+                    timestamp = new DateTime(g.Key.Year, g.Key.Month, 1),
+                    count = g.Count()
+                })
+                .OrderBy(x => x.timestamp)
+                .ToListAsync(),
+            _ => await query
+                .GroupBy(e => new { e.Timestamp.Year, e.Timestamp.Month, e.Timestamp.Day })
+                .Select(g => new
+                {
+                    timestamp = new DateTime(g.Key.Year, g.Key.Month, g.Key.Day),
+                    count = g.Count()
+                })
+                .OrderBy(x => x.timestamp)
+                .ToListAsync()
         };
-
-        var timeseries = data
-            .GroupBy(e => groupSelector(e.Timestamp))
-            .Select(g => new { timestamp = g.Key, count = g.Count() })
-            .OrderBy(x => x.timestamp)
-            .ToList();
 
         return Ok(timeseries);
     }
@@ -134,22 +151,39 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
         [FromQuery] DateTimeOffset to,
         [FromQuery] string interval = "day")
     {
-        var data = await dbContext.ProcessedEvents.AsNoTracking()
-            .Where(e => e.ProjectId == projectId && e.Timestamp >= from && e.Timestamp <= to)
-            .ToListAsync();
+        var query = dbContext.ProcessedEvents.AsNoTracking()
+            .Where(e => e.ProjectId == projectId && e.Timestamp >= from && e.Timestamp <= to);
 
-        Func<DateTimeOffset, DateTime> groupSelector = interval.ToLower() switch
+        var timeseries = interval.ToLower() switch
         {
-            "hour" => dt => new(dt.Year, dt.Month, dt.Day, dt.Hour, 0, 0),
-            "month" => dt => new(dt.Year, dt.Month, 1),
-            _ => dt => new(dt.Year, dt.Month, dt.Day)
+            "hour" => await query
+                .GroupBy(e => new { e.Timestamp.Year, e.Timestamp.Month, e.Timestamp.Day, e.Timestamp.Hour })
+                .Select(g => new
+                {
+                    timestamp = new DateTime(g.Key.Year, g.Key.Month, g.Key.Day, g.Key.Hour, 0, 0),
+                    count = g.Select(x => x.UserId).Distinct().Count()
+                })
+                .OrderBy(x => x.timestamp)
+                .ToListAsync(),
+            "month" => await query
+                .GroupBy(e => new { e.Timestamp.Year, e.Timestamp.Month })
+                .Select(g => new
+                {
+                    timestamp = new DateTime(g.Key.Year, g.Key.Month, 1),
+                    count = g.Select(x => x.UserId).Distinct().Count()
+                })
+                .OrderBy(x => x.timestamp)
+                .ToListAsync(),
+            _ => await query
+                .GroupBy(e => new { e.Timestamp.Year, e.Timestamp.Month, e.Timestamp.Day })
+                .Select(g => new
+                {
+                    timestamp = new DateTime(g.Key.Year, g.Key.Month, g.Key.Day),
+                    count = g.Select(x => x.UserId).Distinct().Count()
+                })
+                .OrderBy(x => x.timestamp)
+                .ToListAsync()
         };
-
-        var timeseries = data
-            .GroupBy(e => groupSelector(e.Timestamp))
-            .Select(g => new { timestamp = g.Key, count = g.Select(x => x.UserId).Distinct().Count() })
-            .OrderBy(x => x.timestamp)
-            .ToList();
 
         return Ok(timeseries);
     }

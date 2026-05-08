@@ -16,6 +16,7 @@ public class ProjectsController(IProjectsService projectsService) : ControllerBa
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetProjects()
     {
+        if (string.IsNullOrEmpty(UserId)) return Unauthorized();
         var result = await projectsService.GetProjectsAsync(UserId);
         return result.IsSuccess ? Ok(result.Value) : MapError(result);
     }
@@ -25,10 +26,11 @@ public class ProjectsController(IProjectsService projectsService) : ControllerBa
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> CreateProject([FromBody] CreateProjectRequest request)
     {
+        if (string.IsNullOrEmpty(UserId)) return Unauthorized();
         var result =
             await projectsService.CreateProjectAsync(UserId, request.Name, request.Description ?? string.Empty);
         var project = result.Value ??
-                      throw new InvalidOperationException("CreateProjectAsync returned success but no project");
+                          throw new InvalidOperationException("CreateProjectAsync returned success but no project");
         return result.IsSuccess
             ? CreatedAtAction(nameof(GetProject), new { id = project.Id }, project)
             : MapError(result);
@@ -40,6 +42,7 @@ public class ProjectsController(IProjectsService projectsService) : ControllerBa
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetProject(Guid id)
     {
+        if (string.IsNullOrEmpty(UserId)) return Unauthorized();
         var result = await projectsService.GetProjectAsync(id, UserId);
         return result.IsSuccess ? Ok(result.Value) : MapError(result);
     }
@@ -50,6 +53,7 @@ public class ProjectsController(IProjectsService projectsService) : ControllerBa
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateProject(Guid id, [FromBody] CreateProjectRequest request)
     {
+        if (string.IsNullOrEmpty(UserId)) return Unauthorized();
         var result =
             await projectsService.UpdateProjectAsync(id, UserId, request.Name, request.Description ?? string.Empty);
         return result.IsSuccess ? Ok(result.Value) : MapError(result);
@@ -61,6 +65,7 @@ public class ProjectsController(IProjectsService projectsService) : ControllerBa
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteProject(Guid id)
     {
+        if (string.IsNullOrEmpty(UserId)) return Unauthorized();
         var result = await projectsService.DeleteProjectAsync(id, UserId);
         return result.IsSuccess ? NoContent() : MapError(result);
     }
@@ -71,6 +76,7 @@ public class ProjectsController(IProjectsService projectsService) : ControllerBa
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RegenerateApiKey(Guid id)
     {
+        if (string.IsNullOrEmpty(UserId)) return Unauthorized();
         var result = await projectsService.RegenerateApiKeyAsync(id, UserId);
         return result.IsSuccess ? Ok(result.Value) : MapError(result);
     }
@@ -82,6 +88,7 @@ public class ProjectsController(IProjectsService projectsService) : ControllerBa
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AddMember(Guid id, [FromBody] AddMemberRequest request)
     {
+        if (string.IsNullOrEmpty(UserId)) return Unauthorized();
         var result = await projectsService.AddMemberAsync(id, UserId, request.Email);
         return result.IsSuccess ? Ok() : MapError(result);
     }
@@ -92,12 +99,13 @@ public class ProjectsController(IProjectsService projectsService) : ControllerBa
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RemoveMember(Guid id, string memberId)
     {
+        if (string.IsNullOrEmpty(UserId)) return Unauthorized();
         var result = await projectsService.RemoveMemberAsync(id, UserId, memberId);
         return result.IsSuccess ? NoContent() : MapError(result);
     }
 
-    private string UserId =>
-        User.FindFirstValue(ClaimTypes.NameIdentifier) ?? throw new UnauthorizedAccessException();
+    private string? UserId =>
+        User.FindFirstValue(ClaimTypes.NameIdentifier);
 
     private IActionResult MapError(Result result)
     {

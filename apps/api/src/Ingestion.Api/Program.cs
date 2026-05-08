@@ -21,7 +21,7 @@ builder.Services.AddDbContext<IdentityValidationContext>(options =>
     options.UseNpgsql(connectionString));
 
 builder.Services.AddScoped<IApiKeyValidator, ApiKeyValidator>();
-builder.Services.AddScoped<IEventPublisher, KafkaEventPublisher>();
+builder.Services.AddSingleton<IEventPublisher, KafkaEventPublisher>();
 builder.Services.AddScoped<IIngestionService, IngestionService>();
 
 builder.Services.AddApiKeyAuthentication();

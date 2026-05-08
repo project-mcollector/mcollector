@@ -9,44 +9,59 @@ public class IngestionService(IEventPublisher publisher, ILogger<IngestionServic
 {
     public async Task IngestAsync(RawEvent rawEvent, CancellationToken cancellationToken = default)
     {
-        logger.LogDebug("Ingesting event {EventId} for project {ProjectId}", rawEvent.EventId, rawEvent.ProjectId);
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug("Ingesting event {EventId} for project {ProjectId}", rawEvent.EventId, rawEvent.ProjectId);
         await publisher.PublishAsync(rawEvent, cancellationToken);
     }
 
     public async Task IngestBatchAsync(IEnumerable<RawEvent> rawEvents, CancellationToken cancellationToken = default)
     {
         var batch = rawEvents.ToList();
-        logger.LogInformation("Ingesting batch of {Count} events", batch.Count);
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug("Ingesting batch of {Count} events", batch.Count);
         foreach (var rawEvent in batch)
             await IngestAsync(rawEvent, cancellationToken);
     }
 }
 
-public class KafkaEventPublisher(IConfiguration configuration, ILogger<KafkaEventPublisher> logger) : IEventPublisher
+public class KafkaEventPublisher : IEventPublisher, IDisposable
 {
-    private readonly string _bootstrapServers =
-        configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
+    private readonly string _topic;
+    private readonly IProducer<Null, string> _producer;
+    private readonly ILogger<KafkaEventPublisher> _logger;
 
-    private readonly string _topic =
-        configuration["Kafka:Topic"] ?? "raw-events";
+    public KafkaEventPublisher(IConfiguration configuration, ILogger<KafkaEventPublisher> logger)
+    {
+        _topic = configuration["Kafka:Topic"] ?? "raw-events";
+        var bootstrapServers = configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
+        var config = new ProducerConfig { BootstrapServers = bootstrapServers };
+        _producer = new ProducerBuilder<Null, string>(config).Build();
+        _logger = logger;
+    }
 
     public async Task PublishAsync<T>(T message, CancellationToken cancellationToken = default)
         where T : class
     {
-        var config = new ProducerConfig { BootstrapServers = _bootstrapServers };
-        using var producer = new ProducerBuilder<Null, string>(config).Build();
-
         var json = JsonSerializer.Serialize(message);
         try
         {
-            var result = await producer.ProduceAsync(_topic, new Message<Null, string> { Value = json }, cancellationToken);
-            logger.LogDebug("Published message to {Topic} [{Partition}@{Offset}]",
-                result.Topic, result.Partition.Value, result.Offset.Value);
+            var result =
+                await _producer.ProduceAsync(_topic, new() { Value = json }, cancellationToken);
+            if (_logger.IsEnabled(LogLevel.Debug))
+                _logger.LogDebug("Published message to {Topic} [{Partition}@{Offset}]",
+                    result.Topic, result.Partition.Value, result.Offset.Value);
         }
         catch (ProduceException<Null, string> ex)
         {
-            logger.LogError(ex, "Kafka produce failed for topic {Topic}: {Reason}", _topic, ex.Error.Reason);
+            if (_logger.IsEnabled(LogLevel.Error))
+                _logger.LogError(ex, "Kafka produce failed for topic {Topic}: {Reason}", _topic, ex.Error.Reason);
             throw;
         }
+    }
+
+    public void Dispose()
+    {
+        GC.SuppressFinalize(this);
+        _producer.Dispose();
     }
 }

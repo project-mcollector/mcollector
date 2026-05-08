@@ -72,13 +72,21 @@ export class Queue {
         events: batch,
       };
 
-      const endpoint = `${this.host.replace(/\/$/, "")}/events`;
+      const endpoint = this.endpoint;
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+
+      if (this.options.projectId) {
+        headers["X-Project-Id"] = this.options.projectId;
+        headers["X-Api-Key"] = this.writeKey;
+      }
 
       const response = await fetch(endpoint, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
+        credentials: "omit",
         body: JSON.stringify(payload),
         keepalive: true,
       });
@@ -135,10 +143,14 @@ export class Queue {
       events: batch,
     };
 
-    const endpoint = `${this.host.replace(/\/$/, "")}/events`;
+    const endpoint = this.endpoint;
 
     if (typeof navigator !== "undefined" && navigator.sendBeacon) {
-      const blob = new Blob([JSON.stringify(payload)], {
+      const payloadToSend = this.options.projectId
+        ? { ...payload, projectId: this.options.projectId }
+        : payload;
+
+      const blob = new Blob([JSON.stringify(payloadToSend)], {
         type: "application/json",
       });
       navigator.sendBeacon(endpoint, blob);
@@ -168,6 +180,30 @@ export class Queue {
   }
 
   private get host(): string {
-    return this.options.apiHost || "http://35.228.4.134:5001/api/v1/ingest";
+    return this.normalizeApiHost(
+      this.options.apiHost || "http://35.228.4.134:5001/api/v1/ingest",
+    );
+  }
+
+  private get endpoint(): string {
+    return `${this.host}/events`;
+  }
+
+  private normalizeApiHost(rawHost: string): string {
+    const trimmedHost = rawHost.trim().replace(/\/+$/, "");
+
+    try {
+      const url = new URL(trimmedHost);
+
+      if (url.pathname === "" || url.pathname === "/") {
+        url.pathname = "/api/v1/ingest";
+      }
+
+      return url.toString().replace(/\/+$/, "");
+    } catch {
+      return trimmedHost.endsWith("/api/v1/ingest")
+        ? trimmedHost
+        : `${trimmedHost}/api/v1/ingest`;
+    }
   }
 }

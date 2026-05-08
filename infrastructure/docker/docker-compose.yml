@@ -142,6 +142,8 @@ services:
         - NEXT_PUBLIC_IDENTITY_URL=http://localhost:5003
         - NEXT_PUBLIC_ANALYTICS_URL=http://localhost:5002
         - NEXT_PUBLIC_INGESTION_URL=http://localhost:5001
+    environment:
+      - INGESTION_INTERNAL_URL=http://ingestion:8080
     ports:
       - "3000:3000"
     depends_on:

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "../dashboard.module.css";
+import { analytics } from "@mcollector/sdk";
 import { authFetch } from "@/lib/auth";
 import { copyToClipboard } from "@/lib/clipboard";
 import { BASE_URL } from "@/lib/constants";
@@ -92,6 +93,10 @@ export default function ProjectsPage() {
       setProjects((prev) => [...prev, created]);
       setNewProjectName("");
       setCreatedProject(created);
+      analytics.track("project_created", {
+        projectId: created.id,
+        projectName: created.name,
+      });
     } catch {
       setError("Не удалось создать проект");
     } finally {

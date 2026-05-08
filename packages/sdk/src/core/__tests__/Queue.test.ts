@@ -69,6 +69,24 @@ describe('Queue', () => {
     expect(stored.length).toBe(0);
   });
 
+  it('should normalize origin-only apiHost values to the ingestion path', () => {
+    (globalThis.fetch as any).mockResolvedValue({ ok: true, status: 200 });
+
+    const originOnlyQueue = new Queue(writeKey, {
+      apiHost: 'https://mcollector.publicvm.com',
+      debug: false,
+      batchSize: 1,
+      flushInterval: 3000,
+    });
+
+    originOnlyQueue.enqueue(createMockEvent('1'));
+
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+
+    const [endpoint] = (globalThis.fetch as any).mock.calls[0];
+    expect(endpoint).toBe('https://mcollector.publicvm.com/api/v1/ingest/events');
+  });
+
   it('should flush when interval timer expires', () => {
     (globalThis.fetch as any).mockResolvedValue({ ok: true, status: 200 });
 

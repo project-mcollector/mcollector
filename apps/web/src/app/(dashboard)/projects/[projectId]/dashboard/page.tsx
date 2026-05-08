@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   LineChart,
@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import styles from "../../../dashboard.module.css";
+import { analytics } from "@mcollector/sdk";
 import { authFetch } from "@/lib/auth";
 import { BASE_URL } from "@/lib/constants";
 import ConfirmModal from "@/components/ConfirmModal";
@@ -81,6 +82,7 @@ export default function DashboardPage() {
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameName, setRenameName] = useState("");
   const [renaming, setRenaming] = useState(false);
+  const trackedOpenProjectId = useRef<string | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -95,6 +97,14 @@ export default function DashboardPage() {
       .then((data) => {
         setProject(data);
         document.title = `MCollector — ${data.name}`;
+        if (trackedOpenProjectId.current !== data.id) {
+          trackedOpenProjectId.current = data.id;
+          analytics.track("project_opened", {
+            projectId: data.id,
+            projectName: data.name,
+            source: "dashboard_page",
+          });
+        }
       })
       .catch(() => {});
   }, [projectId, router]);

@@ -56,10 +56,10 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install
-      - name: Build frontend
-        run: pnpm --filter web build
       - name: Build SDK
         run: pnpm --filter @mcollector/sdk build
+      - name: Build frontend
+        run: pnpm --filter web build
 
   test:
     needs: build
@@ -144,6 +144,10 @@ jobs:
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
+      - name: Clean up Docker resources
+        run: |
+          docker system prune -a -f --volumes
+
       - name: Build and push API images
         run: |
           TAG=${{ github.sha }}
@@ -175,6 +179,9 @@ jobs:
             --build-arg NEXT_PUBLIC_IDENTITY_URL=${{ secrets.WEB_IDENTITY_URL }} \
             --build-arg NEXT_PUBLIC_ANALYTICS_URL=${{ secrets.WEB_ANALYTICS_URL }} \
             --build-arg NEXT_PUBLIC_INGESTION_URL=${{ secrets.WEB_INGESTION_URL }} \
+            --build-arg NEXT_PUBLIC_ANALYTICS_API_KEY=${{ secrets.WEB_ANALYTICS_API_KEY }} \
+            --build-arg NEXT_PUBLIC_ANALYTICS_PROJECT_ID=${{ secrets.WEB_ANALYTICS_PROJECT_ID }} \
+            --build-arg NEXT_PUBLIC_ANALYTICS_API_HOST=${{ secrets.WEB_ANALYTICS_API_HOST || secrets.WEB_INGESTION_URL }} \
             -f apps/web/Dockerfile \
             .
           docker push "${{ env.REGISTRY }}/web:$TAG"
@@ -229,9 +236,10 @@ jobs:
               gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet &&
               sudo mkdir -p /root/.docker &&
               sudo cp ~/.docker/config.json /root/.docker/config.json &&
+              sudo docker image prune -a -f &&
               cd ~/mcollector &&
               sudo docker compose -f infrastructure/docker/docker-compose.prod.yml --env-file ~/.deploy.env pull &&
               sudo docker compose -f infrastructure/docker/docker-compose.prod.yml --env-file ~/.deploy.env up -d --remove-orphans &&
-              sudo docker image prune -f &&
+              sudo docker image prune -a -f &&
               rm -f ~/.deploy.env
             "

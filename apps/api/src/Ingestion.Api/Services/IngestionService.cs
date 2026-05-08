@@ -34,7 +34,13 @@ public class KafkaEventPublisher : IEventPublisher, IDisposable
     {
         _topic = configuration["Kafka:Topic"] ?? "raw-events";
         var bootstrapServers = configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
-        var config = new ProducerConfig { BootstrapServers = bootstrapServers };
+        var config = new ProducerConfig
+        {
+            BootstrapServers = bootstrapServers,
+            MessageTimeoutMs = 5000,
+            RequestTimeoutMs = 3000,
+            SocketTimeoutMs = 3000
+        };
         _producer = new ProducerBuilder<Null, string>(config).Build();
         _logger = logger;
     }

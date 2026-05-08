@@ -20,7 +20,11 @@ export class Analytics {
 
     this.writeKey = writeKey;
     this.options = { ...defaultOptions, ...options };
-    
+
+    if (!this.options.projectId) {
+      console.warn('[mcollector] projectId is required for SDK initialization');
+    }
+
     this.storage = new Storage(this.options.cookieDomain);
     this.sessionManager = new SessionManager(this.storage, this.options.sessionTimeoutConfig);
     this.queue = new Queue(this.writeKey, this.options);
@@ -35,14 +39,13 @@ export class Analytics {
 
   public track(eventName: string, properties: Record<string, any> = {}): void {
     if (!this.checkInitialized()) return;
-    
+
     const event = this.builder.buildTrackEvent(eventName, properties);
     this.queue.enqueue(event);
   }
 
   public identify(userId: string, traits: Record<string, any> = {}): void {
     if (!this.checkInitialized()) return;
-
 
     this.storage.setUserId(userId);
     this.storage.setTraits(traits);
@@ -98,6 +101,5 @@ export class Analytics {
     };
   }
 }
-
 
 export const analytics = new Analytics();

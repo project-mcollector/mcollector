@@ -125,6 +125,8 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    environment:
+      - INGESTION_INTERNAL_URL=http://ingestion:8080
     depends_on:
       ingestion:
         condition: service_healthy

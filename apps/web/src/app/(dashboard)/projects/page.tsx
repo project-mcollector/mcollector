@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "../dashboard.module.css";
 import { analytics } from "@mcollector/sdk";
-import { authFetch } from "@/lib/auth";
+import { authFetch, logout } from "@/lib/auth";
 import { copyToClipboard } from "@/lib/clipboard";
 import { BASE_URL } from "@/lib/constants";
 
@@ -112,16 +112,12 @@ export default function ProjectsPage() {
       const res = await authFetch(`${BASE_URL}/api/projects/${renameTarget.id}`, router, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: renameName.trim(), description: "" }),
+        body: JSON.stringify({ name: renameName.trim() }),
       });
-      if (res.ok) {
-        const updated = await res.json();
-        setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-        setRenameTarget(null);
-        setRenameName("");
-      } else {
-        setError("Не удалось переименовать проект");
-      }
+      const updated = await res.json();
+      setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+      setRenameTarget(null);
+      setRenameName("");
     } catch {
       setError("Не удалось переименовать проект");
     } finally {
@@ -137,15 +133,11 @@ export default function ProjectsPage() {
       const res = await authFetch(`${BASE_URL}/api/projects/${apiKeyModal.id}/api-key/regenerate`, router, {
         method: "POST",
       });
-      if (res.ok) {
-        const updated = await res.json();
-        setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-        setApiKeyModal(updated);
-        setApiKeyVisible(true);
-        setApiKeyCopied(false);
-      } else {
-        setError("Не удалось перегенерировать ключ");
-      }
+      const updated = await res.json();
+      setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+      setApiKeyModal(updated);
+      setApiKeyVisible(true);
+      setApiKeyCopied(false);
     } catch {
       setError("Не удалось перегенерировать ключ");
     } finally {
@@ -179,11 +171,6 @@ export default function ProjectsPage() {
     setCopied(false);
   }
 
-  function logout() {
-    localStorage.removeItem("token");
-    router.push("/login");
-  }
-
   const filteredProjects = projects.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase())
   );
@@ -211,7 +198,7 @@ export default function ProjectsPage() {
             <p className={styles.subtitle}>{projects.length} {projects.length === 1 ? "проект" : projects.length < 5 ? "проекта" : "проектов"}</p>
           )}
         </div>
-        <button className={styles.deleteButtonOutline} onClick={logout}>
+        <button className={styles.deleteButtonOutline} onClick={() => logout(router)}>
           Выйти
         </button>
       </div>

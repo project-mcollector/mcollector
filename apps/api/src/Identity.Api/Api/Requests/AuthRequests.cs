@@ -30,3 +30,15 @@ public class RegisterRequest
     [MaxLength(100)]
     public string? OrganizationName { get; set; }
 }
+
+public class RefreshRequest
+{
+    [Required]
+    public string RefreshToken { get; set; } = string.Empty;
+}
+
+public class RevokeRequest
+{
+    [Required]
+    public string RefreshToken { get; set; } = string.Empty;
+}

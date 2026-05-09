@@ -14,8 +14,7 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
         .AllowAnyHeader()));
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-                       ?? Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
-                       ?? "Host=postgres;Database=mcollector;Username=app;Password=app";
+    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured");
 
 builder.Services.AddDbContext<IdentityValidationContext>(options =>
     options.UseNpgsql(connectionString));

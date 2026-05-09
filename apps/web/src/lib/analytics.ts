@@ -20,7 +20,7 @@ export const initializeAnalytics = () => {
   analytics.init(API_KEY, {
     projectId: PROJECT_ID,
     apiHost: API_HOST,
-    debug: true,
+    debug: process.env.NODE_ENV === 'development',
     autoTrackPages: true,
   });
 };

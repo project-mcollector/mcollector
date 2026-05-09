@@ -53,7 +53,7 @@ public class ProjectsController(IProjectsService projectsService) : ApiControlle
     public async Task<IActionResult> UpdateProject(Guid id, [FromBody] CreateProjectRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(UserId)) return Unauthorized();
-        var result = await projectsService.UpdateProjectAsync(id, UserId, request.Name, request.Description ?? string.Empty, cancellationToken);
+        var result = await projectsService.UpdateProjectAsync(id, UserId, request.Name, request.Description, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : MapError(result);
     }
 

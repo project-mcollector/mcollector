@@ -26,10 +26,8 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddDbContext<AnalyticsDbContext>(options =>
 {
-    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ??
-        builder.Configuration["ConnectionStrings:DefaultConnection"] ??
-        Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection") ??
-        "Host=postgres;Database=mcollector;Username=app;Password=app";
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured");
     options.UseNpgsql(connectionString);
 });
 

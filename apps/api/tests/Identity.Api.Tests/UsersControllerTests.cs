@@ -18,14 +18,14 @@ public class UsersControllerTests
             [new(Guid.NewGuid(), "Platform", "Core platform")]);
 
         var service = new Mock<IUsersService>();
-        service.Setup(x => x.GetCurrentUserAsync(UserId)).ReturnsAsync(profile);
+        service.Setup(x => x.GetCurrentUserAsync(UserId, default)).ReturnsAsync(profile);
 
         var controller = new UsersController(service.Object)
         {
             ControllerContext = TestHelpers.ControllerContextFor(UserId)
         };
 
-        var result = await controller.GetCurrentUser();
+        var result = await controller.GetCurrentUser(CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result);
         var response = Assert.IsType<UserProfileDto>(ok.Value);
@@ -38,7 +38,7 @@ public class UsersControllerTests
     public async Task GetCurrentUser_UserNotFound_ReturnsNotFound()
     {
         var service = new Mock<IUsersService>();
-        service.Setup(x => x.GetCurrentUserAsync(UserId))
+        service.Setup(x => x.GetCurrentUserAsync(UserId, default))
             .ReturnsAsync(Errors.NotFound("User", UserId));
 
         var controller = new UsersController(service.Object)
@@ -46,7 +46,7 @@ public class UsersControllerTests
             ControllerContext = TestHelpers.ControllerContextFor(UserId)
         };
 
-        var result = await controller.GetCurrentUser();
+        var result = await controller.GetCurrentUser(CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result);
     }

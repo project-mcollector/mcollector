@@ -14,6 +14,11 @@ public class IngestionControllerIntegrationTests : IClassFixture<WebApplicationF
 
     public IngestionControllerIntegrationTests(WebApplicationFactory<Program> factory)
     {
+        // Program.cs reads the connection string at module level, before ConfigureServices
+        // overrides fire. Provide a dummy value so the guard doesn't throw.
+        Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection",
+            "Host=localhost;Database=test");
+
         Mock<IEventPublisher> mockPublisher = new();
         Mock<IApiKeyValidator> mockApiKeyValidator = new();
 

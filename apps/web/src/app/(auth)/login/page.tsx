@@ -45,6 +45,7 @@ export default function LoginPage() {
 
       const data = await res.json();
       localStorage.setItem("token", data.accessToken);
+      localStorage.setItem("refreshToken", data.refreshToken);
       router.push("/projects");
     } catch {
       setError("Не удалось подключиться к серверу");

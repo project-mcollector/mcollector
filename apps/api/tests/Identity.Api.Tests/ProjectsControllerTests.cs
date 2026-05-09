@@ -20,14 +20,14 @@ public class ProjectsControllerTests
         };
 
         var service = new Mock<IProjectsService>();
-        service.Setup(x => x.GetProjectsAsync(UserId)).ReturnsAsync(projects);
+        service.Setup(x => x.GetProjectsAsync(UserId, default)).ReturnsAsync(projects);
 
         var controller = new ProjectsController(service.Object)
         {
             ControllerContext = TestHelpers.ControllerContextFor(UserId)
         };
 
-        var result = await controller.GetProjects();
+        var result = await controller.GetProjects(CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result);
         Assert.Equal(projects, ok.Value);
@@ -38,7 +38,7 @@ public class ProjectsControllerTests
     {
         var id = Guid.NewGuid();
         var service = new Mock<IProjectsService>();
-        service.Setup(x => x.GetProjectAsync(id, UserId))
+        service.Setup(x => x.GetProjectAsync(id, UserId, default))
             .ReturnsAsync(Errors.NotFound("Project", id));
 
         var controller = new ProjectsController(service.Object)
@@ -46,7 +46,7 @@ public class ProjectsControllerTests
             ControllerContext = TestHelpers.ControllerContextFor(UserId)
         };
 
-        var result = await controller.GetProject(id);
+        var result = await controller.GetProject(id, CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result);
     }
@@ -56,14 +56,14 @@ public class ProjectsControllerTests
     {
         var id = Guid.NewGuid();
         var service = new Mock<IProjectsService>();
-        service.Setup(x => x.DeleteProjectAsync(id, UserId)).ReturnsAsync(Result.Success());
+        service.Setup(x => x.DeleteProjectAsync(id, UserId, default)).ReturnsAsync(Result.Success());
 
         var controller = new ProjectsController(service.Object)
         {
             ControllerContext = TestHelpers.ControllerContextFor(UserId)
         };
 
-        var result = await controller.DeleteProject(id);
+        var result = await controller.DeleteProject(id, CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
     }
@@ -73,7 +73,7 @@ public class ProjectsControllerTests
     {
         var id = Guid.NewGuid();
         var service = new Mock<IProjectsService>();
-        service.Setup(x => x.AddMemberAsync(id, UserId, "dup@example.com"))
+        service.Setup(x => x.AddMemberAsync(id, UserId, "dup@example.com", default))
             .ReturnsAsync(Errors.Conflict("User is already a member of this project"));
 
         var controller = new ProjectsController(service.Object)
@@ -81,7 +81,7 @@ public class ProjectsControllerTests
             ControllerContext = TestHelpers.ControllerContextFor(UserId)
         };
 
-        var result = await controller.AddMember(id, new() { Email = "dup@example.com" });
+        var result = await controller.AddMember(id, new() { Email = "dup@example.com" }, CancellationToken.None);
 
         Assert.IsType<BadRequestObjectResult>(result);
     }

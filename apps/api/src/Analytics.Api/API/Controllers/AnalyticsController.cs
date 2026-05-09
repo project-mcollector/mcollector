@@ -2,6 +2,7 @@ using Analytics.Api.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using System.Text.Json;
 
 namespace Analytics.Api.API.Controllers;
@@ -15,36 +16,43 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
     public async Task<IActionResult> GetOverview(
         Guid projectId,
         [FromQuery] DateTimeOffset? from,
-        [FromQuery] DateTimeOffset? to)
+        [FromQuery] DateTimeOffset? to,
+        CancellationToken cancellationToken)
     {
+        if (await DenyAccessAsync(projectId, cancellationToken) is { } deny) return deny;
+
         var query = dbContext.ProcessedEvents.AsNoTracking().Where(e => e.ProjectId == projectId);
 
         if (from.HasValue) query = query.Where(e => e.Timestamp >= from.Value);
         if (to.HasValue) query = query.Where(e => e.Timestamp <= to.Value);
 
-        var totalEvents = await query.CountAsync();
-        var uniqueUsers = await query.Select(e => e.UserId).Distinct().CountAsync();
-        var pageViews = await query.Where(e => e.EventName == "$pageview").CountAsync();
+        var totalEvents = await query.CountAsync(cancellationToken);
+        var uniqueUsers = await query.Select(e => e.UserId).Distinct().CountAsync(cancellationToken);
+        var pageViews = await query.Where(e => e.EventName == "$pageview").CountAsync(cancellationToken);
 
         return Ok(new { totalEvents, uniqueUsers, pageViews });
     }
 
     [HttpGet("events")]
-    public async Task<IActionResult> GetEvents(Guid projectId)
+    public async Task<IActionResult> GetEvents(Guid projectId, CancellationToken cancellationToken)
     {
+        if (await DenyAccessAsync(projectId, cancellationToken) is { } deny) return deny;
+
         var rawEvents = await dbContext.ProcessedEvents
             .AsNoTracking()
             .Where(e => e.ProjectId == projectId)
             .Select(e => e.EventName)
             .Distinct()
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         return Ok(rawEvents);
     }
 
     [HttpGet("events/{eventName}/properties")]
-    public async Task<IActionResult> GetEventProperties(Guid projectId, string eventName)
+    public async Task<IActionResult> GetEventProperties(Guid projectId, string eventName, CancellationToken cancellationToken)
     {
+        if (await DenyAccessAsync(projectId, cancellationToken) is { } deny) return deny;
+
         const int sampleSize = 100;
 
         var jsonStrings = await dbContext.ProcessedEvents
@@ -53,7 +61,7 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
             .OrderByDescending(e => e.Timestamp)
             .Select(e => e.PropertiesJson)
             .Take(sampleSize)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         var properties = new HashSet<string>();
         foreach (var json in jsonStrings.Where(json => !string.IsNullOrWhiteSpace(json)))
@@ -66,9 +74,9 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
                 foreach (var property in document.RootElement.EnumerateObject())
                     properties.Add(property.Name);
             }
-            catch
+            catch (JsonException)
             {
-                // ignore invalid json
+                // skip malformed JSON blobs
             }
         }
 
@@ -79,8 +87,11 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
     public async Task<IActionResult> GetEventCounts(
         Guid projectId,
         [FromQuery] DateTimeOffset? from,
-        [FromQuery] DateTimeOffset? to)
+        [FromQuery] DateTimeOffset? to,
+        CancellationToken cancellationToken)
     {
+        if (await DenyAccessAsync(projectId, cancellationToken) is { } deny) return deny;
+
         var query = dbContext.ProcessedEvents.AsNoTracking().Where(e => e.ProjectId == projectId);
 
         if (from.HasValue) query = query.Where(e => e.Timestamp >= from.Value);
@@ -90,7 +101,7 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
             .GroupBy(e => e.EventName)
             .Select(g => new { name = g.Key, count = g.Count() })
             .OrderByDescending(x => x.count)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         return Ok(counts);
     }
@@ -101,8 +112,14 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
         [FromQuery] DateTimeOffset from,
         [FromQuery] DateTimeOffset to,
         [FromQuery] string interval = "day",
-        [FromQuery] string? eventName = null)
+        [FromQuery] string? eventName = null,
+        CancellationToken cancellationToken = default)
     {
+        if (await DenyAccessAsync(projectId, cancellationToken) is { } deny) return deny;
+
+        if (!IsValidInterval(interval))
+            return BadRequest(new { error = $"Invalid interval '{interval}'. Allowed values: hour, day, month." });
+
         var query = dbContext.ProcessedEvents
             .AsNoTracking()
             .Where(e => e.ProjectId == projectId && e.Timestamp >= from && e.Timestamp <= to);
@@ -120,7 +137,7 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
                     count = g.Count()
                 })
                 .OrderBy(x => x.timestamp)
-                .ToListAsync(),
+                .ToListAsync(cancellationToken),
             "month" => await query
                 .GroupBy(e => new { e.Timestamp.Year, e.Timestamp.Month })
                 .Select(g => new
@@ -129,7 +146,7 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
                     count = g.Count()
                 })
                 .OrderBy(x => x.timestamp)
-                .ToListAsync(),
+                .ToListAsync(cancellationToken),
             _ => await query
                 .GroupBy(e => new { e.Timestamp.Year, e.Timestamp.Month, e.Timestamp.Day })
                 .Select(g => new
@@ -138,7 +155,7 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
                     count = g.Count()
                 })
                 .OrderBy(x => x.timestamp)
-                .ToListAsync()
+                .ToListAsync(cancellationToken)
         };
 
         return Ok(timeseries);
@@ -149,8 +166,14 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
         Guid projectId,
         [FromQuery] DateTimeOffset from,
         [FromQuery] DateTimeOffset to,
-        [FromQuery] string interval = "day")
+        [FromQuery] string interval = "day",
+        CancellationToken cancellationToken = default)
     {
+        if (await DenyAccessAsync(projectId, cancellationToken) is { } deny) return deny;
+
+        if (!IsValidInterval(interval))
+            return BadRequest(new { error = $"Invalid interval '{interval}'. Allowed values: hour, day, month." });
+
         var query = dbContext.ProcessedEvents.AsNoTracking()
             .Where(e => e.ProjectId == projectId && e.Timestamp >= from && e.Timestamp <= to);
 
@@ -164,7 +187,7 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
                     count = g.Select(x => x.UserId).Distinct().Count()
                 })
                 .OrderBy(x => x.timestamp)
-                .ToListAsync(),
+                .ToListAsync(cancellationToken),
             "month" => await query
                 .GroupBy(e => new { e.Timestamp.Year, e.Timestamp.Month })
                 .Select(g => new
@@ -173,7 +196,7 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
                     count = g.Select(x => x.UserId).Distinct().Count()
                 })
                 .OrderBy(x => x.timestamp)
-                .ToListAsync(),
+                .ToListAsync(cancellationToken),
             _ => await query
                 .GroupBy(e => new { e.Timestamp.Year, e.Timestamp.Month, e.Timestamp.Day })
                 .Select(g => new
@@ -182,9 +205,25 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
                     count = g.Select(x => x.UserId).Distinct().Count()
                 })
                 .OrderBy(x => x.timestamp)
-                .ToListAsync()
+                .ToListAsync(cancellationToken)
         };
 
         return Ok(timeseries);
     }
+
+    private async Task<IActionResult?> DenyAccessAsync(Guid projectId, CancellationToken cancellationToken)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized();
+
+        var isMember = await dbContext.UserProjects
+            .AsNoTracking()
+            .AnyAsync(up => up.ProjectId == projectId && up.UserId == userId, cancellationToken);
+
+        return isMember ? null : Forbid();
+    }
+
+    private static bool IsValidInterval(string interval) =>
+        interval.ToLower() is "hour" or "day" or "month";
 }

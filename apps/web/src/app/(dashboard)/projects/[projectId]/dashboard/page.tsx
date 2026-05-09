@@ -77,6 +77,7 @@ export default function DashboardPage() {
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
   const [selectedEventTimeseries, setSelectedEventTimeseries] = useState<TimeseriesPoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
@@ -106,7 +107,9 @@ export default function DashboardPage() {
           });
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        setLoadError("Не удалось загрузить данные проекта.");
+      });
   }, [projectId, router]);
 
   useEffect(() => {
@@ -126,6 +129,7 @@ export default function DashboardPage() {
       const base = analyticsBase(projectId);
 
       setLoading(true);
+      setLoadError(null);
       setSelectedEvent(null);
       setSelectedEventTimeseries([]);
 
@@ -145,7 +149,10 @@ export default function DashboardPage() {
         setUsersTimeseries(usersData);
         setEventCounts(countsData);
         setLastUpdated(new Date());
-      } catch {
+      } catch (err) {
+        if (!cancelled && !(err instanceof Error && err.message === "Unauthorized")) {
+          setLoadError("Не удалось загрузить данные. Попробуйте обновить страницу.");
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -187,14 +194,12 @@ export default function DashboardPage() {
       const res = await authFetch(`${BASE_URL}/api/projects/${projectId}`, router, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: renameName.trim(), description: "" }),
+        body: JSON.stringify({ name: renameName.trim() }),
       });
-      if (res.ok) {
-        const updated = await res.json();
-        setProject(updated);
-        document.title = `MCollector — ${updated.name}`;
-        setRenameOpen(false);
-      }
+      const updated = await res.json();
+      setProject(updated);
+      document.title = `MCollector — ${updated.name}`;
+      setRenameOpen(false);
     } catch {
     } finally {
       setRenaming(false);
@@ -204,12 +209,10 @@ export default function DashboardPage() {
   async function confirmDelete() {
     setDeleting(true);
     try {
-      const res = await authFetch(`${BASE_URL}/api/projects/${projectId}`, router, {
+      await authFetch(`${BASE_URL}/api/projects/${projectId}`, router, {
         method: "DELETE",
       });
-      if (res.ok) {
-        router.push("/projects");
-      }
+      router.push("/projects");
     } catch {
     } finally {
       setDeleting(false);
@@ -250,6 +253,14 @@ export default function DashboardPage() {
         </div>
         <div className={styles.skeletonChart} />
         <div className={styles.skeletonChart} />
+      </div>
+    );
+
+  if (loadError)
+    return (
+      <div className={styles.page}>
+        {nav}
+        <p className={styles.emptyState}>{loadError}</p>
       </div>
     );
 

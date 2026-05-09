@@ -22,7 +22,7 @@ public interface IProjectsService
     Task<Result<List<ProjectDto>>> GetProjectsAsync(string userId, CancellationToken cancellationToken = default);
     Task<Result<ProjectDto>> CreateProjectAsync(string userId, string name, string description, CancellationToken cancellationToken = default);
     Task<Result<ProjectWithMembersDto>> GetProjectAsync(Guid id, string userId, CancellationToken cancellationToken = default);
-    Task<Result<ProjectDto>> UpdateProjectAsync(Guid id, string userId, string name, string description, CancellationToken cancellationToken = default);
+    Task<Result<ProjectDto>> UpdateProjectAsync(Guid id, string userId, string name, string? description, CancellationToken cancellationToken = default);
     Task<Result> DeleteProjectAsync(Guid id, string userId, CancellationToken cancellationToken = default);
     Task<Result<ProjectDto>> RegenerateApiKeyAsync(Guid id, string userId, CancellationToken cancellationToken = default);
     Task<Result> AddMemberAsync(Guid id, string userId, string memberEmail, CancellationToken cancellationToken = default);
@@ -69,13 +69,14 @@ public class ProjectsService(
         return ToProjectWithMembersDto(project);
     }
 
-    public async Task<Result<ProjectDto>> UpdateProjectAsync(Guid id, string userId, string name, string description, CancellationToken cancellationToken = default)
+    public async Task<Result<ProjectDto>> UpdateProjectAsync(Guid id, string userId, string name, string? description, CancellationToken cancellationToken = default)
     {
         var project = await FindProjectAsync(id, userId, cancellationToken: cancellationToken);
         if (project is null) return Errors.NotFound("Project", id);
 
         project.Name = name;
-        project.Description = description;
+        if (description is not null)
+            project.Description = description;
         await dbContext.SaveChangesAsync(cancellationToken);
 
         if (logger.IsEnabled(LogLevel.Information))

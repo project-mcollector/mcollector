@@ -8,6 +8,7 @@ public class IdentityAppDbContext(DbContextOptions<IdentityAppDbContext> options
     : IdentityDbContext<ApplicationUser>(options)
 {
     public DbSet<Project> Projects { get; set; }
+    public DbSet<RefreshToken> RefreshTokens { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -24,6 +25,17 @@ public class IdentityAppDbContext(DbContextOptions<IdentityAppDbContext> options
             entity.HasMany(e => e.Users)
                 .WithMany(e => e.Projects)
                 .UsingEntity("UserProjects");
+        });
+
+        builder.Entity<RefreshToken>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Token).IsRequired().HasMaxLength(128);
+            entity.HasIndex(e => e.Token).IsUnique();
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.RefreshTokens)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

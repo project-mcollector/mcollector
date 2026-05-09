@@ -61,7 +61,7 @@ services:
       kafka-init:
         condition: service_completed_successfully
     environment:
-      - ConnectionStrings__DefaultConnection=Host=postgres;Database=mcollector;Username=app;Password=app
+      - ConnectionStrings__DefaultConnection=${DB_CONNECTION_STRING:?DB_CONNECTION_STRING must be set}
       - Kafka__BootstrapServers=kafka:29092
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/api/v1/ingest/health || exit 1"]
@@ -79,7 +79,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      - ConnectionStrings__DefaultConnection=Host=postgres;Database=mcollector;Username=app;Password=app
+      - ConnectionStrings__DefaultConnection=${DB_CONNECTION_STRING:?DB_CONNECTION_STRING must be set}
       - Jwt__Secret=${JWT_SECRET:?JWT_SECRET must be set}
       - AllowedOrigins=${ALLOWED_ORIGIN:-http://localhost:3000}
     healthcheck:
@@ -98,7 +98,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      - ConnectionStrings__DefaultConnection=Host=postgres;Database=mcollector;Username=app;Password=app
+      - ConnectionStrings__DefaultConnection=${DB_CONNECTION_STRING:?DB_CONNECTION_STRING must be set}
       - Jwt__Secret=${JWT_SECRET:?JWT_SECRET must be set}
       - AllowedOrigins=${ALLOWED_ORIGIN:-http://localhost:3000}
     healthcheck:
@@ -117,7 +117,7 @@ services:
       analytics:
         condition: service_healthy
     environment:
-      - ConnectionStrings__DefaultConnection=Host=postgres;Database=mcollector;Username=app;Password=app
+      - ConnectionStrings__DefaultConnection=${DB_CONNECTION_STRING:?DB_CONNECTION_STRING must be set}
       - Kafka__BootstrapServers=kafka:29092
 
   web:

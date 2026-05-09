@@ -83,6 +83,7 @@ export default function RegisterPage() {
       }
 
       localStorage.setItem("token", data.accessToken);
+      localStorage.setItem("refreshToken", data.refreshToken);
 
       const projectRes = await fetch(`${BASE_URL}/api/projects`, {
         method: "POST",
@@ -93,8 +94,12 @@ export default function RegisterPage() {
         body: JSON.stringify({ name: organizationName }),
       });
 
-      const project = await projectRes.json();
-      setCreatedProject({ id: project.id, apiKey: project.apiKey });
+      if (projectRes.ok) {
+        const project = await projectRes.json();
+        setCreatedProject({ id: project.id, apiKey: project.apiKey });
+      } else {
+        router.push("/projects");
+      }
     } catch {
       setError("Не удалось подключиться к серверу");
     } finally {

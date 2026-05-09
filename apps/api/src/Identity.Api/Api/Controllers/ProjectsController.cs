@@ -1,7 +1,8 @@
+using Identity.Api.Api.Requests;
 using Identity.Api.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
+using Microsoft.AspNetCore.RateLimiting;
 using Utilities;
 
 namespace Identity.Api.Api.Controllers;
@@ -9,30 +10,28 @@ namespace Identity.Api.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
-public class ProjectsController(IProjectsService projectsService) : ControllerBase
+[EnableRateLimiting("api")]
+public class ProjectsController(IProjectsService projectsService) : ApiControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(List<ProjectDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetProjects()
+    public async Task<IActionResult> GetProjects(CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(UserId)) return Unauthorized();
-        var result = await projectsService.GetProjectsAsync(UserId);
+        var result = await projectsService.GetProjectsAsync(UserId, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : MapError(result);
     }
 
     [HttpPost]
     [ProducesResponseType(typeof(ProjectDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> CreateProject([FromBody] CreateProjectRequest request)
+    public async Task<IActionResult> CreateProject([FromBody] CreateProjectRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(UserId)) return Unauthorized();
-        var result =
-            await projectsService.CreateProjectAsync(UserId, request.Name, request.Description ?? string.Empty);
-        var project = result.Value ??
-                          throw new InvalidOperationException("CreateProjectAsync returned success but no project");
+        var result = await projectsService.CreateProjectAsync(UserId, request.Name, request.Description ?? string.Empty, cancellationToken);
         return result.IsSuccess
-            ? CreatedAtAction(nameof(GetProject), new { id = project.Id }, project)
+            ? CreatedAtAction(nameof(GetProject), new { id = result.Value!.Id }, result.Value)
             : MapError(result);
     }
 
@@ -40,10 +39,10 @@ public class ProjectsController(IProjectsService projectsService) : ControllerBa
     [ProducesResponseType(typeof(ProjectWithMembersDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetProject(Guid id)
+    public async Task<IActionResult> GetProject(Guid id, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(UserId)) return Unauthorized();
-        var result = await projectsService.GetProjectAsync(id, UserId);
+        var result = await projectsService.GetProjectAsync(id, UserId, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : MapError(result);
     }
 
@@ -51,11 +50,10 @@ public class ProjectsController(IProjectsService projectsService) : ControllerBa
     [ProducesResponseType(typeof(ProjectDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UpdateProject(Guid id, [FromBody] CreateProjectRequest request)
+    public async Task<IActionResult> UpdateProject(Guid id, [FromBody] CreateProjectRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(UserId)) return Unauthorized();
-        var result =
-            await projectsService.UpdateProjectAsync(id, UserId, request.Name, request.Description ?? string.Empty);
+        var result = await projectsService.UpdateProjectAsync(id, UserId, request.Name, request.Description ?? string.Empty, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : MapError(result);
     }
 
@@ -63,10 +61,10 @@ public class ProjectsController(IProjectsService projectsService) : ControllerBa
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DeleteProject(Guid id)
+    public async Task<IActionResult> DeleteProject(Guid id, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(UserId)) return Unauthorized();
-        var result = await projectsService.DeleteProjectAsync(id, UserId);
+        var result = await projectsService.DeleteProjectAsync(id, UserId, cancellationToken);
         return result.IsSuccess ? NoContent() : MapError(result);
     }
 
@@ -74,10 +72,10 @@ public class ProjectsController(IProjectsService projectsService) : ControllerBa
     [ProducesResponseType(typeof(ProjectDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> RegenerateApiKey(Guid id)
+    public async Task<IActionResult> RegenerateApiKey(Guid id, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(UserId)) return Unauthorized();
-        var result = await projectsService.RegenerateApiKeyAsync(id, UserId);
+        var result = await projectsService.RegenerateApiKeyAsync(id, UserId, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : MapError(result);
     }
 
@@ -86,10 +84,10 @@ public class ProjectsController(IProjectsService projectsService) : ControllerBa
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> AddMember(Guid id, [FromBody] AddMemberRequest request)
+    public async Task<IActionResult> AddMember(Guid id, [FromBody] AddMemberRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(UserId)) return Unauthorized();
-        var result = await projectsService.AddMemberAsync(id, UserId, request.Email);
+        var result = await projectsService.AddMemberAsync(id, UserId, request.Email, cancellationToken);
         return result.IsSuccess ? Ok() : MapError(result);
     }
 
@@ -97,15 +95,12 @@ public class ProjectsController(IProjectsService projectsService) : ControllerBa
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> RemoveMember(Guid id, string memberId)
+    public async Task<IActionResult> RemoveMember(Guid id, string memberId, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(UserId)) return Unauthorized();
-        var result = await projectsService.RemoveMemberAsync(id, UserId, memberId);
+        var result = await projectsService.RemoveMemberAsync(id, UserId, memberId, cancellationToken);
         return result.IsSuccess ? NoContent() : MapError(result);
     }
-
-    private string? UserId =>
-        User.FindFirstValue(ClaimTypes.NameIdentifier);
 
     private IActionResult MapError(Result result)
     {
@@ -119,15 +114,4 @@ public class ProjectsController(IProjectsService projectsService) : ControllerBa
             _ => StatusCode(500, error.Description)
         };
     }
-}
-
-public class AddMemberRequest
-{
-    public string Email { get; set; } = string.Empty;
-}
-
-public class CreateProjectRequest
-{
-    public string Name { get; set; } = string.Empty;
-    public string? Description { get; set; }
 }

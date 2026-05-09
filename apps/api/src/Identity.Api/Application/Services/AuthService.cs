@@ -12,8 +12,8 @@ public record AuthTokenDto(string AccessToken, double ExpiresIn);
 
 public interface IAuthService
 {
-    Task<Result<AuthTokenDto>> LoginAsync(string email, string password);
-    Task<Result<AuthTokenDto>> RegisterAsync(string email, string password);
+    Task<Result<AuthTokenDto>> LoginAsync(string email, string password, CancellationToken cancellationToken = default);
+    Task<Result<AuthTokenDto>> RegisterAsync(string email, string password, CancellationToken cancellationToken = default);
 }
 
 public class AuthService(
@@ -21,22 +21,41 @@ public class AuthService(
     IConfiguration configuration,
     ILogger<AuthService> logger) : IAuthService
 {
-    public async Task<Result<AuthTokenDto>> LoginAsync(string email, string password)
+    private readonly string _jwtSecret = configuration["Jwt:Secret"]
+        ?? throw new InvalidOperationException("Jwt:Secret is not configured");
+
+    public async Task<Result<AuthTokenDto>> LoginAsync(string email, string password, CancellationToken cancellationToken = default)
     {
         var user = await userManager.FindByEmailAsync(email);
-        if (user is null || !await userManager.CheckPasswordAsync(user, password))
+        if (user is null)
         {
             if (logger.IsEnabled(LogLevel.Warning))
                 logger.LogWarning("Failed login attempt for {Email}", email);
             return Errors.Unauthorized(email);
         }
 
+        if (await userManager.IsLockedOutAsync(user))
+        {
+            if (logger.IsEnabled(LogLevel.Warning))
+                logger.LogWarning("Locked-out login attempt for {UserId}", user.Id);
+            return Errors.Unauthorized(email);
+        }
+
+        if (!await userManager.CheckPasswordAsync(user, password))
+        {
+            await userManager.AccessFailedAsync(user);
+            if (logger.IsEnabled(LogLevel.Warning))
+                logger.LogWarning("Failed login attempt for {UserId}", user.Id);
+            return Errors.Unauthorized(email);
+        }
+
+        await userManager.ResetAccessFailedCountAsync(user);
         if (logger.IsEnabled(LogLevel.Information))
             logger.LogInformation("User {UserId} logged in", user.Id);
         return BuildToken(user);
     }
 
-    public async Task<Result<AuthTokenDto>> RegisterAsync(string email, string password)
+    public async Task<Result<AuthTokenDto>> RegisterAsync(string email, string password, CancellationToken cancellationToken = default)
     {
         var user = new ApplicationUser { Email = email, UserName = email };
         var result = await userManager.CreateAsync(user, password);
@@ -56,10 +75,7 @@ public class AuthService(
 
     private AuthTokenDto BuildToken(ApplicationUser user)
     {
-        var secret = configuration["Jwt:Secret"]
-                     ?? throw new InvalidOperationException("Jwt:Secret is not configured");
-
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSecret));
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, user.Id),

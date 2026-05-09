@@ -1,8 +1,16 @@
 using Identity.Api.Application.Services;
 using Identity.Api.Domain.Entities;
+using Identity.Api.Infrastructure.HealthChecks;
 using Identity.Api.Infrastructure.Persistence;
 using Infrastructure.Auth;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using System.Security.Claims;
+using System.Text.Json;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,7 +19,7 @@ builder.Configuration
     .AddJsonFile($"config/appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true)
     .AddEnvironmentVariables();
 
-builder.Services.AddOpenApi(options => { options.AddDocumentTransformer((_, _, _) => Task.CompletedTask); });
+builder.Services.AddOpenApi();
 
 builder.Services.AddAuthorizationBuilder()
     .SetDefaultPolicy(new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
@@ -24,13 +32,17 @@ builder.Services.AddSharedAuthentication(builder.Configuration);
 builder.Services.AddDbContext<IdentityAppDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-                           ?? Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
-                           ?? "Host=postgres;Database=mcollector;Username=app;Password=app";
+        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured");
 
     options.UseNpgsql(connectionString);
 });
 
-builder.Services.AddIdentityCore<ApplicationUser>()
+builder.Services.AddIdentityCore<ApplicationUser>(options =>
+{
+    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+    options.Lockout.AllowedForNewUsers = true;
+})
     .AddEntityFrameworkStores<IdentityAppDbContext>();
 
 builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
@@ -38,8 +50,47 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IProjectsService, ProjectsService>();
 builder.Services.AddScoped<IUsersService, UsersService>();
 
-builder.Services.AddHealthChecks();
+builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
 builder.Services.AddControllers();
+
+builder.Services.AddRateLimiter(options =>
+{
+    // IP-based fixed window for unauthenticated auth endpoints
+    options.AddPolicy("auth", context =>
+    {
+        var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(
+            ip,
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            });
+    });
+
+    // User ID-based sliding window for authenticated API endpoints
+    options.AddPolicy("api", context =>
+    {
+        var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? context.Connection.RemoteIpAddress?.ToString()
+            ?? "unknown";
+        return RateLimitPartition.GetSlidingWindowLimiter(
+            userId,
+            _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            });
+    });
+
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+});
 
 builder.Services.AddCors(options =>
 {
@@ -51,6 +102,11 @@ builder.Services.AddCors(options =>
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
+});
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
 });
 
 var app = builder.Build();
@@ -74,10 +130,35 @@ app.UseHttpsRedirection();
 
 app.UseCors();
 
+app.UseForwardedHeaders();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapHealthChecks("/health");
+app.UseRateLimiter();
+
+app.MapHealthChecks("/health/live");
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = WriteHealthResponse
+});
 app.MapControllers();
 
 app.Run();
+
+static Task WriteHealthResponse(HttpContext context, HealthReport report)
+{
+    context.Response.ContentType = "application/json";
+    var result = JsonSerializer.Serialize(new
+    {
+        status = report.Status.ToString(),
+        checks = report.Entries.Select(e => new
+        {
+            name = e.Key,
+            status = e.Value.Status.ToString(),
+            description = e.Value.Description
+        })
+    }, JsonSerializerOptions.Web);
+    return context.Response.WriteAsync(result);
+}

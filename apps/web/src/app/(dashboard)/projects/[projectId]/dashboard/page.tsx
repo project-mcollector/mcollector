@@ -406,6 +406,13 @@ export default function DashboardPage() {
         <div className={styles.chartHeader}>
           <h2 className={styles.chartTitle}>Топ событий</h2>
           <div className={styles.countsControls}>
+            {eventCountsPeriod !== "total" && (
+              <div className={styles.periodNav}>
+                <button className={styles.periodNavBtn} onClick={() => setPeriodOffset((o) => o + 1)}>←</button>
+                <span className={styles.periodNavLabel}>{formatPeriodLabel(eventCountsPeriod, periodOffset)}</span>
+                <button className={styles.periodNavBtn} onClick={() => setPeriodOffset((o) => o - 1)} disabled={periodOffset === 0}>→</button>
+              </div>
+            )}
             <div className={styles.dateRange}>
               {(["total", "day", "week", "month"] as const).map((p) => (
                 <button
@@ -417,13 +424,6 @@ export default function DashboardPage() {
                 </button>
               ))}
             </div>
-            {eventCountsPeriod !== "total" && (
-              <div className={styles.periodNav}>
-                <button className={styles.periodNavBtn} onClick={() => setPeriodOffset((o) => o + 1)}>←</button>
-                <span className={styles.periodNavLabel}>{formatPeriodLabel(eventCountsPeriod, periodOffset)}</span>
-                <button className={styles.periodNavBtn} onClick={() => setPeriodOffset((o) => o - 1)} disabled={periodOffset === 0}>→</button>
-              </div>
-            )}
           </div>
         </div>
         {eventCounts.length === 0 ? (

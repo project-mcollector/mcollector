@@ -2,7 +2,6 @@ using Analytics.Api.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Security.Claims;
 using System.Text.Json;
 
 namespace Analytics.Api.API.Controllers;
@@ -19,8 +18,6 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
         [FromQuery] DateTimeOffset? to,
         CancellationToken cancellationToken)
     {
-        if (await DenyAccessAsync(projectId, cancellationToken) is { } deny) return deny;
-
         var query = dbContext.ProcessedEvents.AsNoTracking().Where(e => e.ProjectId == projectId);
 
         if (from.HasValue) query = query.Where(e => e.Timestamp >= from.Value);
@@ -36,8 +33,6 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
     [HttpGet("events")]
     public async Task<IActionResult> GetEvents(Guid projectId, CancellationToken cancellationToken)
     {
-        if (await DenyAccessAsync(projectId, cancellationToken) is { } deny) return deny;
-
         var rawEvents = await dbContext.ProcessedEvents
             .AsNoTracking()
             .Where(e => e.ProjectId == projectId)
@@ -51,8 +46,6 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
     [HttpGet("events/{eventName}/properties")]
     public async Task<IActionResult> GetEventProperties(Guid projectId, string eventName, CancellationToken cancellationToken)
     {
-        if (await DenyAccessAsync(projectId, cancellationToken) is { } deny) return deny;
-
         const int sampleSize = 100;
 
         var jsonStrings = await dbContext.ProcessedEvents
@@ -90,8 +83,6 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
         [FromQuery] DateTimeOffset? to,
         CancellationToken cancellationToken)
     {
-        if (await DenyAccessAsync(projectId, cancellationToken) is { } deny) return deny;
-
         var query = dbContext.ProcessedEvents.AsNoTracking().Where(e => e.ProjectId == projectId);
 
         if (from.HasValue) query = query.Where(e => e.Timestamp >= from.Value);
@@ -115,8 +106,6 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
         [FromQuery] string? eventName = null,
         CancellationToken cancellationToken = default)
     {
-        if (await DenyAccessAsync(projectId, cancellationToken) is { } deny) return deny;
-
         if (!IsValidInterval(interval))
             return BadRequest(new { error = $"Invalid interval '{interval}'. Allowed values: hour, day, month." });
 
@@ -209,19 +198,6 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
         };
 
         return Ok(timeseries);
-    }
-
-    private async Task<IActionResult?> DenyAccessAsync(Guid projectId, CancellationToken cancellationToken)
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrEmpty(userId))
-            return Unauthorized();
-
-        var isMember = await dbContext.UserProjects
-            .AsNoTracking()
-            .AnyAsync(up => up.ProjectId == projectId && up.UserId == userId, cancellationToken);
-
-        return isMember ? null : Forbid();
     }
 
     private static bool IsValidInterval(string interval) =>

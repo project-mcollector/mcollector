@@ -81,8 +81,21 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
         Guid projectId,
         [FromQuery] DateTimeOffset? from,
         [FromQuery] DateTimeOffset? to,
+        [FromQuery] string? period,
         CancellationToken cancellationToken)
     {
+        if (period is "day" or "week" or "month")
+        {
+            var now = DateTimeOffset.UtcNow;
+            to = now;
+            from = period switch
+            {
+                "day" => now.AddDays(-1),
+                "week" => now.AddDays(-7),
+                _ => now.AddDays(-30),
+            };
+        }
+
         var query = dbContext.ProcessedEvents.AsNoTracking().Where(e => e.ProjectId == projectId);
 
         if (from.HasValue) query = query.Where(e => e.Timestamp >= from.Value);

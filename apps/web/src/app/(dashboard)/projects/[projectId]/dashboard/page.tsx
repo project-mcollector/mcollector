@@ -28,6 +28,22 @@ function getDateRange(days: number) {
   };
 }
 
+const PERIOD_MS = { day: 86_400_000, week: 7 * 86_400_000, month: 30 * 86_400_000 };
+
+function getPeriodRange(period: "day" | "week" | "month", offset: number) {
+  const ms = PERIOD_MS[period];
+  const toTime = Date.now() - offset * ms;
+  const fromTime = toTime - ms;
+  return { from: new Date(fromTime).toISOString(), to: new Date(toTime).toISOString() };
+}
+
+function formatPeriodLabel(period: "day" | "week" | "month", offset: number) {
+  const { from, to } = getPeriodRange(period, offset);
+  const fmt = (iso: string) =>
+    new Date(iso).toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+  return period === "day" ? fmt(from) : `${fmt(from)} — ${fmt(to)}`;
+}
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("ru-RU", {
     month: "short",
@@ -76,6 +92,8 @@ export default function DashboardPage() {
   const [eventCounts, setEventCounts] = useState<EventCount[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
   const [selectedEventTimeseries, setSelectedEventTimeseries] = useState<TimeseriesPoint[]>([]);
+  const [eventCountsPeriod, setEventCountsPeriod] = useState<"total" | "day" | "week" | "month">("total");
+  const [periodOffset, setPeriodOffset] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -134,12 +152,11 @@ export default function DashboardPage() {
       setSelectedEventTimeseries([]);
 
       try {
-        const [overviewData, eventsData, usersData, countsData] =
+        const [overviewData, eventsData, usersData] =
           await Promise.all([
             authFetch(`${base}/overview?from=${from}&to=${to}`, router).then((r) => r.json()),
             authFetch(`${base}/events/timeseries?from=${from}&to=${to}&interval=day`, router).then((r) => r.json()),
             authFetch(`${base}/users/timeseries?from=${from}&to=${to}&interval=day`, router).then((r) => r.json()),
-            authFetch(`${base}/events/counts?from=${from}&to=${to}`, router).then((r) => r.json()),
           ]);
 
         if (cancelled) return;
@@ -147,7 +164,6 @@ export default function DashboardPage() {
         setOverview(overviewData);
         setEventsTimeseries(eventsData);
         setUsersTimeseries(usersData);
-        setEventCounts(countsData);
         setLastUpdated(new Date());
       } catch (err) {
         if (!cancelled && !(err instanceof Error && err.message === "Unauthorized")) {
@@ -164,6 +180,34 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, [projectId, days, refreshKey, router]);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    let cancelled = false;
+    const base = analyticsBase(projectId);
+
+    async function loadCounts() {
+      let url = `${base}/events/counts`;
+      if (eventCountsPeriod === "total") {
+        const { from, to } = getDateRange(days);
+        url += `?from=${from}&to=${to}`;
+      } else {
+        const { from, to } = getPeriodRange(eventCountsPeriod, periodOffset);
+        url += `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+      }
+
+      try {
+        const data = await authFetch(url, router).then((r) => r.json());
+        if (!cancelled) setEventCounts(data);
+      } catch {
+      }
+    }
+
+    loadCounts();
+    return () => { cancelled = true; };
+  }, [projectId, days, refreshKey, eventCountsPeriod, periodOffset, router]);
 
   function handleEventClick(eventName: string) {
     if (selectedEvent === eventName) {
@@ -359,7 +403,29 @@ export default function DashboardPage() {
       </div>
 
       <div className={styles.chartSection}>
-        <h2 className={styles.chartTitle}>Топ событий</h2>
+        <div className={styles.chartHeader}>
+          <h2 className={styles.chartTitle}>Топ событий</h2>
+          <div className={styles.countsControls}>
+            <div className={styles.dateRange}>
+              {(["total", "day", "week", "month"] as const).map((p) => (
+                <button
+                  key={p}
+                  className={eventCountsPeriod === p ? styles.dateRangeActive : styles.dateRangeBtn}
+                  onClick={() => { setEventCountsPeriod(p); setPeriodOffset(0); }}
+                >
+                  {p === "total" ? "Всего" : p === "day" ? "День" : p === "week" ? "Неделя" : "Месяц"}
+                </button>
+              ))}
+            </div>
+            {eventCountsPeriod !== "total" && (
+              <div className={styles.periodNav}>
+                <button className={styles.periodNavBtn} onClick={() => setPeriodOffset((o) => o + 1)}>←</button>
+                <span className={styles.periodNavLabel}>{formatPeriodLabel(eventCountsPeriod, periodOffset)}</span>
+                <button className={styles.periodNavBtn} onClick={() => setPeriodOffset((o) => o - 1)} disabled={periodOffset === 0}>→</button>
+              </div>
+            )}
+          </div>
+        </div>
         {eventCounts.length === 0 ? (
           <p className={styles.chartEmpty}>Нет данных</p>
         ) : (
@@ -367,7 +433,7 @@ export default function DashboardPage() {
             <thead>
               <tr>
                 <th>Название</th>
-                <th>Количество</th>
+                <th>{eventCountsPeriod === "total" ? "Всего" : eventCountsPeriod === "day" ? "За день" : eventCountsPeriod === "week" ? "За неделю" : "За месяц"}</th>
                 <th></th>
               </tr>
             </thead>

@@ -158,8 +158,6 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
         [FromQuery] string interval = "day",
         CancellationToken cancellationToken = default)
     {
-        if (await DenyAccessAsync(projectId, cancellationToken) is { } deny) return deny;
-
         if (!IsValidInterval(interval))
             return BadRequest(new { error = $"Invalid interval '{interval}'. Allowed values: hour, day, month." });
 

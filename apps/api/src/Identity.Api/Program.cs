@@ -137,6 +137,7 @@ app.UseAuthorization();
 
 app.UseRateLimiter();
 
+app.MapHealthChecks("/health");
 app.MapHealthChecks("/health/live");
 app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {

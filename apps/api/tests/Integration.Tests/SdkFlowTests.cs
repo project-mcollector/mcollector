@@ -84,15 +84,6 @@ public class SdkFlowTests
 
         _analyticsClient.DefaultRequestHeaders.Authorization =
             new("Bearer", GenerateJwt());
-
-        // DenyAccessAsync checks UserProjects membership. Seed the test user so
-        // analytics endpoints don't return 403.
-        var seedOptions = new DbContextOptionsBuilder<AnalyticsDbContext>()
-            .UseInMemoryDatabase(_dbName, InMemoryDbRoot)
-            .Options;
-        using var seedDb = new AnalyticsDbContext(seedOptions);
-        seedDb.UserProjects.Add(new() { ProjectId = _projectId, UserId = "integration-user" });
-        seedDb.SaveChanges();
     }
 
     [Fact]

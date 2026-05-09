@@ -20,9 +20,6 @@ public class AnalyticsControllerTests
 
     private static AnalyticsController CreateController(AnalyticsDbContext dbContext, Guid projectId)
     {
-        dbContext.UserProjects.Add(new() { ProjectId = projectId, UserId = TestUserId });
-        dbContext.SaveChanges();
-
         var controller = new AnalyticsController(dbContext);
         controller.ControllerContext = new ControllerContext
         {

@@ -641,6 +641,39 @@
     background: #f4f4f5;
 }
 
+.iconButtonDanger {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #fca5a5;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+}
+
+.iconButtonDanger:hover {
+    color: #b91c1c;
+    background: #fef2f2;
+}
+
+.userInfo {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.userEmail {
+    font-size: 13px;
+    color: #71717a;
+    margin-right: 4px;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .projectCardActions {
     display: flex;
     align-items: center;
@@ -725,6 +758,21 @@
 
     .dashboardControls {
         width: 100%;
+    }
+
+    .chartHeader {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .countsControls {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .periodNavLabel {
+        min-width: 0;
     }
 
     .projectsGrid {

@@ -26,12 +26,14 @@ public class ProjectsController(IProjectsService projectsService) : ApiControlle
     [HttpPost]
     [ProducesResponseType(typeof(ProjectDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> CreateProject([FromBody] CreateProjectRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> CreateProject([FromBody] CreateProjectRequest request,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(UserId)) return Unauthorized();
-        var result = await projectsService.CreateProjectAsync(UserId, request.Name, request.Description ?? string.Empty, cancellationToken);
+        var result = await projectsService.CreateProjectAsync(UserId, request.Name, request.Description ?? string.Empty,
+            cancellationToken);
         return result.IsSuccess
-            ? CreatedAtAction(nameof(GetProject), new { id = result.Value!.Id }, result.Value)
+            ? CreatedAtAction(nameof(GetProject), new { id = result.Value?.Id }, result.Value)
             : MapError(result);
     }
 
@@ -50,10 +52,12 @@ public class ProjectsController(IProjectsService projectsService) : ApiControlle
     [ProducesResponseType(typeof(ProjectDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UpdateProject(Guid id, [FromBody] CreateProjectRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> UpdateProject(Guid id, [FromBody] CreateProjectRequest request,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(UserId)) return Unauthorized();
-        var result = await projectsService.UpdateProjectAsync(id, UserId, request.Name, request.Description, cancellationToken);
+        var result =
+            await projectsService.UpdateProjectAsync(id, UserId, request.Name, request.Description, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : MapError(result);
     }
 
@@ -84,7 +88,8 @@ public class ProjectsController(IProjectsService projectsService) : ApiControlle
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> AddMember(Guid id, [FromBody] AddMemberRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> AddMember(Guid id, [FromBody] AddMemberRequest request,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(UserId)) return Unauthorized();
         var result = await projectsService.AddMemberAsync(id, UserId, request.Email, cancellationToken);

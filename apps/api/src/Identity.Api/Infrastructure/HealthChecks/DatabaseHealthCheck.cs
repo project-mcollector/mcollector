@@ -5,7 +5,8 @@ namespace Identity.Api.Infrastructure.HealthChecks;
 
 public class DatabaseHealthCheck(IdentityAppDbContext dbContext) : IHealthCheck
 {
-    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
+    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context,
+        CancellationToken cancellationToken = default)
     {
         try
         {

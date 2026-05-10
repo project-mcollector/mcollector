@@ -17,7 +17,9 @@ public class UsersController(IUsersService usersService) : ApiControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetCurrentUser(CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(UserId)) return Unauthorized();
+        if (string.IsNullOrEmpty(UserId))
+            return Unauthorized();
+
         var result = await usersService.GetCurrentUserAsync(UserId, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : NotFound();
     }

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "../login.module.css";
-import { copyToClipboard } from "@/lib/clipboard";
 import { BASE_URL } from "@/lib/constants";
 
 export default function RegisterPage() {
@@ -18,8 +17,9 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
-  const [createdProject, setCreatedProject] = useState<{ id: string; apiKey: string } | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendDone, setResendDone] = useState(false);
 
   useEffect(() => {
     document.title = "MCollector — Регистрация";
@@ -67,6 +67,8 @@ export default function RegisterPage() {
     }
 
     setLoading(true);
+    localStorage.setItem("pendingOrgName", organizationName);
+    localStorage.setItem("pendingEmail", email);
 
     try {
       const res = await fetch(`${BASE_URL}/api/auth/register`, {
@@ -75,36 +77,66 @@ export default function RegisterPage() {
         body: JSON.stringify({ email, password, organizationName }),
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        setError(data.message || "Ошибка регистрации");
+        localStorage.removeItem("pendingOrgName");
+        localStorage.removeItem("pendingEmail");
+        const text = await res.text();
+        setError(text || "Ошибка регистрации");
         return;
       }
 
-      localStorage.setItem("token", data.accessToken);
-      localStorage.setItem("refreshToken", data.refreshToken);
-
-      const projectRes = await fetch(`${BASE_URL}/api/projects`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${data.accessToken}`,
-        },
-        body: JSON.stringify({ name: organizationName }),
-      });
-
-      if (projectRes.ok) {
-        const project = await projectRes.json();
-        setCreatedProject({ id: project.id, apiKey: project.apiKey });
-      } else {
-        router.push("/projects");
-      }
+      setSuccess(true);
     } catch {
+      localStorage.removeItem("pendingOrgName");
+      localStorage.removeItem("pendingEmail");
       setError("Не удалось подключиться к серверу");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleResend() {
+    setResendLoading(true);
+    try {
+      await fetch(`${BASE_URL}/api/auth/resend-confirmation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      setResendDone(true);
+    } finally {
+      setResendLoading(false);
+    }
+  }
+
+  if (success) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.card}>
+          <h1 className={styles.title}>MCollector</h1>
+          <p className={styles.subtitle}>Проверьте почту</p>
+          <p style={{ fontSize: 14, color: "#3f3f46", textAlign: "center", lineHeight: 1.6 }}>
+            Мы отправили письмо на <strong>{email}</strong>.<br />
+            Перейдите по ссылке в письме, чтобы подтвердить аккаунт.
+          </p>
+          <p className={styles.linkText}>
+            Письмо не пришло?{" "}
+            {resendDone ? (
+              <span style={{ color: "#16a34a", fontWeight: 500 }}>Отправлено</span>
+            ) : (
+              <button
+                onClick={handleResend}
+                disabled={resendLoading}
+                style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                className={styles.link}
+              >
+                {resendLoading ? "Отправка..." : "Отправить снова"}
+              </button>
+            )}
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -220,52 +252,6 @@ export default function RegisterPage() {
         </p>
       </div>
 
-      {createdProject && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modal}>
-            <h2 className={styles.modalTitle}>Проект создан!</h2>
-            <p className={styles.modalSubtitle}>
-              Сохраните ваш API-ключ — он понадобится для подключения SDK к сайту
-            </p>
-
-            <label className={styles.label}>Ваш API-ключ</label>
-            <div className={styles.apiKeyBox}>
-              <span className={styles.apiKeyText}>{createdProject.apiKey}</span>
-              <button
-                className={styles.buttonSmall}
-                onClick={async () => {
-                  await copyToClipboard(createdProject.apiKey);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                }}
-              >
-                {copied ? "Скопировано ✓" : "Скопировать"}
-              </button>
-            </div>
-
-            <label className={styles.label}>Установка</label>
-            <div className={styles.codeBlock}>{`npm install @mcollector/sdk`}</div>
-
-            <label className={styles.label}>Инициализация</label>
-            <div className={styles.codeBlock}>{`import { analytics } from '@mcollector/sdk'\n\nanalytics.init('${createdProject.apiKey}')`}</div>
-
-            <div className={styles.modalButtons}>
-              <button
-                className={styles.button}
-                onClick={() => router.push(`/projects/${createdProject.id}/dashboard`)}
-              >
-                Перейти в дашборд
-              </button>
-              <button
-                className={styles.buttonOutline}
-                onClick={() => router.push("/projects")}
-              >
-                К проектам
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

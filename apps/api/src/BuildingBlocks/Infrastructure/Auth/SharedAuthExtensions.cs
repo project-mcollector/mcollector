@@ -8,6 +8,9 @@ namespace Infrastructure.Auth;
 
 public static class SharedAuthExtensions
 {
+    public const string Issuer = "mcollector.identity.api";
+    public const string Audience = "mcollector.api";
+
     public static IServiceCollection AddSharedAuthentication(this IServiceCollection services,
         IConfiguration configuration)
     {
@@ -20,8 +23,10 @@ public static class SharedAuthExtensions
                 {
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
-                    ValidateIssuer = false,
-                    ValidateAudience = false,
+                    ValidateIssuer = true,
+                    ValidIssuer = Issuer,
+                    ValidateAudience = true,
+                    ValidAudience = Audience,
                     ClockSkew = TimeSpan.Zero
                 };
             });

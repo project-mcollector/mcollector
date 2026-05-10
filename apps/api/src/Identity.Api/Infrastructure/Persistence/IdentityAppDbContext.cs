@@ -33,7 +33,7 @@ public class IdentityAppDbContext(DbContextOptions<IdentityAppDbContext> options
             entity.Property(e => e.Token).IsRequired().HasMaxLength(128);
             entity.HasIndex(e => e.Token).IsUnique();
             entity.HasOne(e => e.User)
-                .WithMany(u => u.RefreshTokens)
+                .WithMany()
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });

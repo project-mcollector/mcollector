@@ -213,6 +213,8 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           ALLOWED_ORIGIN: ${{ secrets.ALLOWED_ORIGIN }}
           DB_CONNECTION_STRING: ${{ secrets.DB_CONNECTION_STRING }}
+          RESEND_APITOKEN: ${{ secrets.RESEND_APITOKEN }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
         run: |
           {
             echo "REGISTRY=${{ env.REGISTRY }}"
@@ -220,6 +222,8 @@ jobs:
             echo "JWT_SECRET=${JWT_SECRET}"
             echo "ALLOWED_ORIGIN=${ALLOWED_ORIGIN}"
             echo "DB_CONNECTION_STRING=${DB_CONNECTION_STRING}"
+            echo "RESEND_APITOKEN=${RESEND_APITOKEN}"
+            echo "FRONTEND_URL=${FRONTEND_URL}"
           } > /tmp/deploy.env
 
           gcloud compute scp /tmp/deploy.env \

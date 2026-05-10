@@ -5,12 +5,14 @@ using Identity.Api.Infrastructure.Persistence;
 using Infrastructure.Auth;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Identity;
+using Resend;
+using Utilities;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,23 +34,36 @@ builder.Services.AddSharedAuthentication(builder.Configuration);
 builder.Services.AddDbContext<IdentityAppDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured");
+                           ?? throw new InvalidOperationException(
+                               "Connection string 'DefaultConnection' is not configured");
 
     options.UseNpgsql(connectionString);
 });
 
 builder.Services.AddIdentityCore<ApplicationUser>(options =>
-{
-    options.Lockout.MaxFailedAccessAttempts = 5;
-    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
-    options.Lockout.AllowedForNewUsers = true;
-})
-    .AddEntityFrameworkStores<IdentityAppDbContext>();
+    {
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+        options.Lockout.AllowedForNewUsers = true;
+        options.SignIn.RequireConfirmedEmail = true;
+    })
+    .AddEntityFrameworkStores<IdentityAppDbContext>()
+    .AddDefaultTokenProviders();
 
+builder.Services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
 builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IProjectsService, ProjectsService>();
 builder.Services.AddScoped<IUsersService, UsersService>();
+
+builder.Services.AddOptions();
+builder.Services.AddHttpClient<ResendClient>();
+builder.Services.Configure<ResendClientOptions>(o =>
+{
+    o.ApiToken = builder.Configuration["RESEND_APITOKEN"] ?? throw new InvalidOperationException(
+        "Resend API Token is not set");
+});
+builder.Services.AddTransient<IResend, ResendClient>();
 
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
@@ -62,7 +77,7 @@ builder.Services.AddRateLimiter(options =>
         var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
         return RateLimitPartition.GetFixedWindowLimiter(
             ip,
-            _ => new FixedWindowRateLimiterOptions
+            _ => new()
             {
                 PermitLimit = 10,
                 Window = TimeSpan.FromMinutes(1),
@@ -75,11 +90,11 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy("api", context =>
     {
         var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? context.Connection.RemoteIpAddress?.ToString()
-            ?? "unknown";
+                     ?? context.Connection.RemoteIpAddress?.ToString()
+                     ?? "unknown";
         return RateLimitPartition.GetSlidingWindowLimiter(
             userId,
-            _ => new SlidingWindowRateLimiterOptions
+            _ => new()
             {
                 PermitLimit = 100,
                 Window = TimeSpan.FromMinutes(1),
@@ -123,7 +138,7 @@ using (var scope = app.Services.CreateScope())
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
-    app.UseSwaggerUI(options => { options.SwaggerEndpoint("/openapi/v1.json", "API v1"); });
+    app.UseSwaggerUI(options => { options.SwaggerEndpoint("/openapi/v1.json", "IdentityApi v1"); });
 }
 
 app.UseHttpsRedirection();
@@ -139,7 +154,7 @@ app.UseRateLimiter();
 
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/health/live");
-app.MapHealthChecks("/health/ready", new HealthCheckOptions
+app.MapHealthChecks("/health/ready", new()
 {
     Predicate = check => check.Tags.Contains("ready"),
     ResponseWriter = WriteHealthResponse
@@ -147,6 +162,7 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 app.MapControllers();
 
 app.Run();
+return;
 
 static Task WriteHealthResponse(HttpContext context, HealthReport report)
 {

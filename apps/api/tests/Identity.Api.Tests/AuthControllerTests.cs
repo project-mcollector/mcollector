@@ -20,8 +20,23 @@ public class AuthControllerTests
             new() { Email = "user@acme.dev", Password = "bad-password" },
             CancellationToken.None);
 
-        var unauthorized = Assert.IsType<UnauthorizedObjectResult>(result);
-        Assert.Equal("Invalid credentials", unauthorized.Value);
+        Assert.IsType<UnauthorizedResult>(result);
+    }
+
+    [Fact]
+    public async Task Login_UnconfirmedEmail_ReturnsForbidden()
+    {
+        var authService = new Mock<IAuthService>();
+        authService.Setup(x => x.LoginAsync("user@acme.dev", "Password1!", default))
+            .ReturnsAsync(Errors.EmailNotConfirmed());
+
+        var controller = new AuthController(authService.Object);
+        var result = await controller.Login(
+            new() { Email = "user@acme.dev", Password = "Password1!" },
+            CancellationToken.None);
+
+        var statusResult = Assert.IsType<StatusCodeResult>(result);
+        Assert.Equal(403, statusResult.StatusCode);
     }
 
     [Fact]

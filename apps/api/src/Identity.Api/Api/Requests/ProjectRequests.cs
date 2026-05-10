@@ -6,10 +6,10 @@ public class CreateProjectRequest
 {
     [Required]
     [MaxLength(100)]
-    public string Name { get; set; } = string.Empty;
+    public required string Name { get; init; }
 
     [MaxLength(500)]
-    public string? Description { get; set; }
+    public string? Description { get; init; }
 }
 
 public class AddMemberRequest
@@ -17,5 +17,5 @@ public class AddMemberRequest
     [Required]
     [EmailAddress]
     [MaxLength(256)]
-    public string Email { get; set; } = string.Empty;
+    public required string Email { get; init; }
 }

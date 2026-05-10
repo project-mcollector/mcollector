@@ -6,22 +6,61 @@ import Link from "next/link";
 import { BASE_URL } from "@/lib/constants";
 import styles from "../login.module.css";
 
+function isTokenFresh(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return typeof payload.exp === "number" && payload.exp * 1000 > Date.now();
+  } catch {
+    return false;
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [emailUnconfirmed, setEmailUnconfirmed] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendDone, setResendDone] = useState(false);
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     document.title = "MCollector — Вход";
-    if (localStorage.getItem("token")) {
-      router.replace("/projects");
-    } else {
+
+    async function checkSession() {
+      const token = localStorage.getItem("token");
+      if (token && isTokenFresh(token)) {
+        router.replace("/projects");
+        return;
+      }
+
+      const refreshToken = localStorage.getItem("refreshToken");
+      if (refreshToken) {
+        try {
+          const res = await fetch(`${BASE_URL}/api/auth/refresh`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ refreshToken }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            localStorage.setItem("token", data.accessToken);
+            localStorage.setItem("refreshToken", data.refreshToken);
+            router.replace("/projects");
+            return;
+          }
+        } catch {}
+      }
+
+      localStorage.removeItem("token");
+      localStorage.removeItem("refreshToken");
       setReady(true);
     }
+
+    checkSession();
   }, [router]);
 
   if (!ready) return null;
@@ -30,6 +69,7 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setEmailUnconfirmed(false);
 
     try {
       const res = await fetch(`${BASE_URL}/api/auth/login`, {
@@ -37,6 +77,11 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
+
+      if (res.status === 403) {
+        setEmailUnconfirmed(true);
+        return;
+      }
 
       if (!res.ok) {
         setError("Неверный email или пароль");
@@ -54,6 +99,20 @@ export default function LoginPage() {
     }
   }
 
+  async function handleResend() {
+    setResendLoading(true);
+    try {
+      await fetch(`${BASE_URL}/api/auth/resend-confirmation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      setResendDone(true);
+    } finally {
+      setResendLoading(false);
+    }
+  }
+
   return (
     <div className={styles.page}>
       <div className={styles.card}>
@@ -62,6 +121,23 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className={styles.form}>
           {error && <div className={styles.error}>{error}</div>}
+          {emailUnconfirmed && (
+            <div className={styles.error}>
+              Подтвердите email перед входом{" "}
+              {resendDone ? (
+                <span style={{ color: "#16a34a" }}>Письмо отправлено</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  disabled={resendLoading}
+                  style={{ background: "none", border: "none", cursor: "pointer", padding: 0, textDecoration: "underline" }}
+                >
+                  {resendLoading ? "Отправка..." : "Отправить снова"}
+                </button>
+              )}
+            </div>
+          )}
 
           <div>
             <label className={styles.label}>Email</label>

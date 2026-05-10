@@ -101,6 +101,8 @@ services:
       - ConnectionStrings__DefaultConnection=${DB_CONNECTION_STRING:?DB_CONNECTION_STRING must be set}
       - Jwt__Secret=${JWT_SECRET:?JWT_SECRET must be set}
       - AllowedOrigins=${ALLOWED_ORIGIN:-http://localhost:3000}
+      - RESEND_APITOKEN=${RESEND_APITOKEN:?RESEND_APITOKEN must be set}
+      - FrontendUrl=${FRONTEND_URL:?FRONTEND_URL must be set}
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
       interval: 10s

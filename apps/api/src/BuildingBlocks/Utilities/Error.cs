@@ -18,4 +18,7 @@ public static class Errors
 
     public static Error Internal(string description)
         => new("Internal", description);
+
+    public static Error EmailNotConfirmed()
+        => new("Email.NotConfirmed", "Email address has not been confirmed");
 }

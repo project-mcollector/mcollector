@@ -106,20 +106,21 @@ public class AuthService(
         var emailToken = await userManager
             .GenerateEmailConfirmationTokenAsync(user);
         var encodedEmailToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(emailToken));
-        var frontUrl =
-            $"{configuration["FrontendUrl"] ?? throw new InvalidOperationException("FrontendUrl is not configured")}";
+        var frontUrl = configuration["FrontendUrl"]
+            ?? throw new InvalidOperationException("FrontendUrl is not configured");
+        if (!frontUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
+            !frontUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("FrontendUrl must include the protocol (https://)");
         var confirmationLink =
-            $"{frontUrl}/confirm-email" +
+            $"{frontUrl.TrimEnd('/')}/confirm-email" +
             $"?userId={user.Id}" +
             $"&token={encodedEmailToken}";
 
         var message = new EmailMessage
         {
             From = "MCollector <noreply@mail.mcollector.publicvm.com>",
-            Subject = "Confirm your email",
-            HtmlBody =
-                $"<p>Thank you for registering. Please confirm your email by clicking the link below:</p>" +
-                $"<p><a href=\"{confirmationLink.Replace("&", "&amp;")}\">Confirm Email</a></p>"
+            Subject = "Подтвердите email",
+            HtmlBody = BuildConfirmationEmailHtml(confirmationLink, frontUrl, dateTimeProvider.UtcNow.Year)
         };
         message.To.Add(email);
 
@@ -202,19 +203,21 @@ public class AuthService(
 
         var emailToken = await userManager.GenerateEmailConfirmationTokenAsync(user);
         var encodedEmailToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(emailToken));
-        var frontUrl = configuration["FrontendUrl"] ?? throw new InvalidOperationException("FrontendUrl is not configured");
+        var frontUrl = configuration["FrontendUrl"]
+            ?? throw new InvalidOperationException("FrontendUrl is not configured");
+        if (!frontUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
+            !frontUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("FrontendUrl must include the protocol (https://)");
         var confirmationLink =
-            $"{frontUrl}/confirm-email" +
+            $"{frontUrl.TrimEnd('/')}/confirm-email" +
             $"?userId={user.Id}" +
             $"&token={encodedEmailToken}";
 
         var message = new EmailMessage
         {
             From = "MCollector <noreply@mail.mcollector.publicvm.com>",
-            Subject = "Confirm your email",
-            HtmlBody =
-                $"<p>Thank you for registering. Please confirm your email by clicking the link below:</p>" +
-                $"<p><a href=\"{confirmationLink.Replace("&", "&amp;")}\">Confirm Email</a></p>"
+            Subject = "Подтвердите email",
+            HtmlBody = BuildConfirmationEmailHtml(confirmationLink, frontUrl, dateTimeProvider.UtcNow.Year)
         };
         message.To.Add(email);
 
@@ -230,6 +233,24 @@ public class AuthService(
         }
 
         return Result.Success();
+    }
+
+    private static string BuildConfirmationEmailHtml(string confirmationLink, string frontUrl, int year)
+    {
+        var safeLink = confirmationLink.Replace("&", "&amp;");
+        return $"""
+            <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;color:#1a1a1a">
+              <p>Спасибо за регистрацию! Нажмите на кнопку ниже, чтобы подтвердить ваш email:</p>
+              <p><a href="{safeLink}" style="display:inline-block;padding:10px 20px;background:#18181b;color:#fff;text-decoration:none;border-radius:6px">Подтвердить email</a></p>
+              <p style="color:#888;font-size:12px;margin-top:24px">Если кнопка не работает, скопируйте ссылку в браузер:</p>
+              <p style="color:#888;font-size:12px;word-break:break-all">{confirmationLink}</p>
+              <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
+              <p style="color:#aaa;font-size:11px;text-align:center;margin:0">
+                © {year} MCollector &nbsp;·&nbsp;
+                <a href="{frontUrl}" style="color:#aaa;text-decoration:none">{frontUrl}</a>
+              </p>
+            </div>
+            """;
     }
 
     private async Task<AuthTokenDto> BuildTokenAsync(ApplicationUser user, CancellationToken cancellationToken)

@@ -108,23 +108,22 @@ jobs:
       - name: Build SDK
         run: pnpm --filter @mcollector/sdk build
 
-      - name: Generate version
-        id: version
+      - name: Check if version already published
+        id: version_check
         run: |
-          BASE_VERSION=$(node -p "require('./packages/sdk/package.json').version")
-          DATE=$(date +'%Y%m%d')
-          SHORT_SHA=${GITHUB_SHA::7}
-          VERSION="${BASE_VERSION}-dev.${DATE}.${SHORT_SHA}"
-
+          VERSION=$(node -p "require('./packages/sdk/package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Set version
-        run: |
-          cd packages/sdk
-          npm version ${{ steps.version.outputs.version }} --no-git-tag-version
+          if npm view @mcollector/sdk@$VERSION version 2>/dev/null | grep -q "$VERSION"; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish SDK
-        run: pnpm --filter @mcollector/sdk publish --access public --tag dev --no-git-checks
+        if: steps.version_check.outputs.skip == 'false'
+        run: pnpm --filter @mcollector/sdk publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 

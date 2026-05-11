@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { BASE_URL } from "@/lib/constants";
 import styles from "../login.module.css";
+import IntegrationCard from "../IntegrationCard";
 
 function isTokenFresh(token: string): boolean {
   try {
@@ -115,6 +116,7 @@ export default function LoginPage() {
 
   return (
     <div className={styles.page}>
+      <div className={styles.twoCol}>
       <div className={styles.card}>
         <h1 className={styles.title}>MCollector</h1>
         <p className={styles.subtitle}>Аналитика для вашего сайта</p>
@@ -190,6 +192,8 @@ export default function LoginPage() {
             </Link>
           </p>
         </form>
+      </div>
+      <IntegrationCard />
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "../login.module.css";
 import { BASE_URL } from "@/lib/constants";
+import IntegrationCard from "../IntegrationCard";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -141,6 +142,7 @@ export default function RegisterPage() {
 
   return (
     <div className={styles.page}>
+      <div className={styles.twoCol}>
       <div className={styles.card}>
         <h1 className={styles.title}>MCollector</h1>
         <p className={styles.subtitle}>Создайте аккаунт</p>
@@ -251,7 +253,8 @@ export default function RegisterPage() {
           </Link>
         </p>
       </div>
-
+      <IntegrationCard />
+      </div>
     </div>
   );
 }

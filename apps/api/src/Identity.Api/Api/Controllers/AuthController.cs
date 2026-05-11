@@ -63,6 +63,25 @@ public class AuthController(IAuthService authService) : ApiControllerBase
         return result.IsSuccess ? Ok(result.Value) : Unauthorized("Invalid or expired refresh token");
     }
 
+    [HttpPost("forgot-password")]
+    [EnableRateLimiting("auth")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request, CancellationToken cancellationToken)
+    {
+        await authService.ForgotPasswordAsync(request.Email, cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("reset-password")]
+    [EnableRateLimiting("auth")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request, CancellationToken cancellationToken)
+    {
+        var result = await authService.ResetPasswordAsync(request.UserId, request.Token, request.Password, cancellationToken);
+        return result.IsSuccess ? NoContent() : BadRequest(result.Error?.Description);
+    }
+
     [HttpPost("logout")]
     [EnableRateLimiting("auth")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

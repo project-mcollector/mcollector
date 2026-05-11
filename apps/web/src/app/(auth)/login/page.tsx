@@ -155,7 +155,10 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className={styles.label}>Пароль</label>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <label className={styles.label} style={{ marginBottom: 0 }}>Пароль</label>
+              <Link href="/forgot-password" className={styles.link} style={{ fontSize: 13 }}>Забыли пароль?</Link>
+            </div>
             <div className={styles.passwordWrapper}>
               <input
                 type={showPassword ? "text" : "password"}

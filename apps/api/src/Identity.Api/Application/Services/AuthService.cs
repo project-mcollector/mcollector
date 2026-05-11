@@ -31,6 +31,8 @@ public interface IAuthService
         CancellationToken cancellationToken = default);
 
     Task<Result> ResendConfirmationEmailAsync(string email, CancellationToken cancellationToken = default);
+    Task<Result> ForgotPasswordAsync(string email, CancellationToken cancellationToken = default);
+    Task<Result> ResetPasswordAsync(string userId, string token, string password, CancellationToken cancellationToken = default);
 }
 
 public class AuthService(
@@ -233,6 +235,90 @@ public class AuthService(
         }
 
         return Result.Success();
+    }
+
+    public async Task<Result> ForgotPasswordAsync(string email, CancellationToken cancellationToken = default)
+    {
+        var user = await userManager.FindByEmailAsync(email);
+
+        if (user is null || !user.EmailConfirmed)
+            return Result.Success();
+
+        var resetToken = await userManager.GeneratePasswordResetTokenAsync(user);
+        var encodedToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(resetToken));
+        var frontUrl = configuration["FrontendUrl"]
+            ?? throw new InvalidOperationException("FrontendUrl is not configured");
+        if (!frontUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
+            !frontUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("FrontendUrl must include the protocol (https://)");
+        var resetLink =
+            $"{frontUrl.TrimEnd('/')}/reset-password" +
+            $"?userId={user.Id}" +
+            $"&token={encodedToken}";
+
+        var message = new EmailMessage
+        {
+            From = "MCollector <noreply@mail.mcollector.publicvm.com>",
+            Subject = "Сброс пароля",
+            HtmlBody = BuildPasswordResetEmailHtml(resetLink, frontUrl, dateTimeProvider.UtcNow.Year)
+        };
+        message.To.Add(email);
+
+        try
+        {
+            await emailService.EmailSendAsync(message, cancellationToken);
+        }
+        catch (Exception e)
+        {
+            if (logger.IsEnabled(LogLevel.Error))
+                logger.LogError(e, "Failed to send password reset email to {Email}", email);
+            return Errors.Internal("Failed to send password reset email");
+        }
+
+        return Result.Success();
+    }
+
+    public async Task<Result> ResetPasswordAsync(string userId, string token, string password,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await userManager.FindByIdAsync(userId);
+        if (user is null)
+            return Errors.Validation("ResetPassword", "Invalid reset link");
+
+        var decodedTokenBytes = WebEncoders.Base64UrlDecode(token);
+        var decodedToken = Encoding.UTF8.GetString(decodedTokenBytes);
+        var result = await userManager.ResetPasswordAsync(user, decodedToken, password);
+
+        if (!result.Succeeded)
+            return Errors.Validation("ResetPassword", string.Join("; ", result.Errors.Select(e => e.Description)));
+
+        await dbContext.RefreshTokens
+            .Where(t => t.UserId == userId && t.RevokedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, dateTimeProvider.UtcNow), cancellationToken);
+
+        if (logger.IsEnabled(LogLevel.Information))
+            logger.LogInformation("User {UserId} reset their password", userId);
+
+        return Result.Success();
+    }
+
+    private static string BuildPasswordResetEmailHtml(string resetLink, string frontUrl, int year)
+    {
+        var safeLink = resetLink.Replace("&", "&amp;");
+        return $"""
+            <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;color:#1a1a1a">
+              <p>Вы запросили сброс пароля. Нажмите на кнопку ниже, чтобы задать новый пароль:</p>
+              <p><a href="{safeLink}" style="display:inline-block;padding:10px 20px;background:#18181b;color:#fff;text-decoration:none;border-radius:6px">Сбросить пароль</a></p>
+              <p style="color:#888;font-size:12px;margin-top:24px">Если вы не запрашивали сброс пароля, просто проигнорируйте это письмо.</p>
+              <p style="color:#888;font-size:12px">Если кнопка не работает, скопируйте ссылку в браузер:</p>
+              <p style="color:#888;font-size:12px;word-break:break-all">{resetLink}</p>
+              <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
+              <p style="color:#aaa;font-size:11px;text-align:center;margin:0">
+                © {year} MCollector &nbsp;·&nbsp;
+                <a href="{frontUrl}" style="color:#aaa;text-decoration:none">{frontUrl}</a>
+              </p>
+            </div>
+            """;
     }
 
     private static string BuildConfirmationEmailHtml(string confirmationLink, string frontUrl, int year)

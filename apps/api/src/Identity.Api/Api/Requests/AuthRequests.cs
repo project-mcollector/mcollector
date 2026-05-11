@@ -47,3 +47,22 @@ public class ResendConfirmationRequest
     [MaxLength(256)]
     public required string Email { get; init; }
 }
+
+public class ForgotPasswordRequest
+{
+    [Required]
+    [EmailAddress]
+    [MaxLength(256)]
+    public required string Email { get; init; }
+}
+
+public class ResetPasswordRequest
+{
+    [Required] public required string UserId { get; init; }
+    [Required] public required string Token { get; init; }
+
+    [Required]
+    [MinLength(8)]
+    [MaxLength(128)]
+    public required string Password { get; init; }
+}

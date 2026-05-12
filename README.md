@@ -2,6 +2,11 @@
 
 Data collection and analytics platform designed for scalable event tracking and insights across services
 
+<a href="mailto:noreply@mail.mcollector.publicvm.com">
+  <kbd>📧 Contact us</kbd>
+</a>
+
+
 ## Setup
 
 ```bash

@@ -129,6 +129,10 @@ services:
       - "3000:3000"
     environment:
       - INGESTION_INTERNAL_URL=http://ingestion:8080
+      - RESEND_APITOKEN=${RESEND_APITOKEN:?RESEND_APITOKEN must be set}
+      - RESEND_WEBHOOK_SECRET=${RESEND_WEBHOOK_SECRET:?RESEND_WEBHOOK_SECRET must be set}
+      - RESEND_FORWARD_TO=${RESEND_FORWARD_TO:?RESEND_FORWARD_TO must be set}
+      - RESEND_FORWARD_FROM=${RESEND_FORWARD_FROM:?RESEND_FORWARD_FROM must be set}
     depends_on:
       ingestion:
         condition: service_healthy

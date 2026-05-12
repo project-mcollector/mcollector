@@ -213,6 +213,9 @@ jobs:
           ALLOWED_ORIGIN: ${{ secrets.ALLOWED_ORIGIN }}
           DB_CONNECTION_STRING: ${{ secrets.DB_CONNECTION_STRING }}
           RESEND_APITOKEN: ${{ secrets.RESEND_APITOKEN }}
+          RESEND_WEBHOOK_SECRET: ${{ secrets.RESEND_WEBHOOK_SECRET }}
+          RESEND_FORWARD_TO: ${{ secrets.RESEND_FORWARD_TO }}
+          RESEND_FORWARD_FROM: ${{ secrets.RESEND_FORWARD_FROM }}
           FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
         run: |
           {
@@ -222,6 +225,9 @@ jobs:
             echo "ALLOWED_ORIGIN=${ALLOWED_ORIGIN}"
             echo "DB_CONNECTION_STRING=${DB_CONNECTION_STRING}"
             echo "RESEND_APITOKEN=${RESEND_APITOKEN}"
+            echo "RESEND_WEBHOOK_SECRET=${RESEND_WEBHOOK_SECRET}"
+            echo "RESEND_FORWARD_TO=${RESEND_FORWARD_TO}"
+            echo "RESEND_FORWARD_FROM=${RESEND_FORWARD_FROM}"
             echo "FRONTEND_URL=${FRONTEND_URL}"
           } > /tmp/deploy.env
 

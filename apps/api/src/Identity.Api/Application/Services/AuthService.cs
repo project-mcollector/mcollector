@@ -43,6 +43,8 @@ public class AuthService(
     IDateTimeProvider dateTimeProvider,
     IResend emailService) : IAuthService
 {
+    private const string SenderAddress = "MCollector <noreply@mail.mcollector.publicvm.com>";
+
     private readonly string _jwtSecret = configuration["Jwt:Secret"]
                                          ?? throw new InvalidOperationException("Jwt:Secret is not configured");
 
@@ -105,39 +107,17 @@ public class AuthService(
         if (logger.IsEnabled(LogLevel.Information))
             logger.LogInformation("User {UserId} registered with email {Email}", user.Id, email);
 
-        var emailToken = await userManager
-            .GenerateEmailConfirmationTokenAsync(user);
+        var emailToken = await userManager.GenerateEmailConfirmationTokenAsync(user);
         var encodedEmailToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(emailToken));
-        var frontUrl = configuration["FrontendUrl"]
-            ?? throw new InvalidOperationException("FrontendUrl is not configured");
-        if (!frontUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
-            !frontUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("FrontendUrl must include the protocol (https://)");
+        var frontUrl = GetFrontendUrl();
         var confirmationLink =
             $"{frontUrl.TrimEnd('/')}/confirm-email" +
             $"?userId={user.Id}" +
             $"&token={encodedEmailToken}";
 
-        var message = new EmailMessage
-        {
-            From = "MCollector <noreply@mail.mcollector.publicvm.com>",
-            Subject = "Подтвердите email",
-            HtmlBody = BuildConfirmationEmailHtml(confirmationLink, frontUrl, dateTimeProvider.UtcNow.Year)
-        };
-        message.To.Add(email);
-
-        try
-        {
-            await emailService.EmailSendAsync(message, cancellationToken);
-        }
-        catch (Exception e)
-        {
-            if (logger.IsEnabled(LogLevel.Error))
-                logger.LogError(e, "Failed to send confirmation email to {Email}", email);
-            return Errors.Internal("Failed to send confirmation email");
-        }
-
-        return Result.Success();
+        return await SendEmailAsync(email, "Подтвердите email",
+            BuildConfirmationEmailHtml(confirmationLink, frontUrl, dateTimeProvider.UtcNow.Year),
+            cancellationToken);
     }
 
     public async Task<Result<AuthTokenDto>> RefreshAsync(string refreshToken,
@@ -187,8 +167,10 @@ public class AuthService(
         if (user is null)
             return Errors.Unauthorized("Invalid user id");
 
-        var decodedTokenBytes = WebEncoders.Base64UrlDecode(emailToken);
-        var decodedToken = Encoding.UTF8.GetString(decodedTokenBytes);
+        string decodedToken;
+        try { decodedToken = DecodeBase64UrlToken(emailToken); }
+        catch (FormatException) { return Errors.Validation("Email Confirmation", "Invalid token"); }
+
         var result = await userManager.ConfirmEmailAsync(user, decodedToken);
 
         return result.Succeeded
@@ -205,36 +187,15 @@ public class AuthService(
 
         var emailToken = await userManager.GenerateEmailConfirmationTokenAsync(user);
         var encodedEmailToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(emailToken));
-        var frontUrl = configuration["FrontendUrl"]
-            ?? throw new InvalidOperationException("FrontendUrl is not configured");
-        if (!frontUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
-            !frontUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("FrontendUrl must include the protocol (https://)");
+        var frontUrl = GetFrontendUrl();
         var confirmationLink =
             $"{frontUrl.TrimEnd('/')}/confirm-email" +
             $"?userId={user.Id}" +
             $"&token={encodedEmailToken}";
 
-        var message = new EmailMessage
-        {
-            From = "MCollector <noreply@mail.mcollector.publicvm.com>",
-            Subject = "Подтвердите email",
-            HtmlBody = BuildConfirmationEmailHtml(confirmationLink, frontUrl, dateTimeProvider.UtcNow.Year)
-        };
-        message.To.Add(email);
-
-        try
-        {
-            await emailService.EmailSendAsync(message, cancellationToken);
-        }
-        catch (Exception e)
-        {
-            if (logger.IsEnabled(LogLevel.Error))
-                logger.LogError(e, "Failed to resend confirmation email to {Email}", email);
-            return Errors.Internal("Failed to send confirmation email");
-        }
-
-        return Result.Success();
+        return await SendEmailAsync(email, "Подтвердите email",
+            BuildConfirmationEmailHtml(confirmationLink, frontUrl, dateTimeProvider.UtcNow.Year),
+            cancellationToken);
     }
 
     public async Task<Result> ForgotPasswordAsync(string email, CancellationToken cancellationToken = default)
@@ -246,36 +207,15 @@ public class AuthService(
 
         var resetToken = await userManager.GeneratePasswordResetTokenAsync(user);
         var encodedToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(resetToken));
-        var frontUrl = configuration["FrontendUrl"]
-            ?? throw new InvalidOperationException("FrontendUrl is not configured");
-        if (!frontUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
-            !frontUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("FrontendUrl must include the protocol (https://)");
+        var frontUrl = GetFrontendUrl();
         var resetLink =
             $"{frontUrl.TrimEnd('/')}/reset-password" +
             $"?userId={user.Id}" +
             $"&token={encodedToken}";
 
-        var message = new EmailMessage
-        {
-            From = "MCollector <noreply@mail.mcollector.publicvm.com>",
-            Subject = "Сброс пароля",
-            HtmlBody = BuildPasswordResetEmailHtml(resetLink, frontUrl, dateTimeProvider.UtcNow.Year)
-        };
-        message.To.Add(email);
-
-        try
-        {
-            await emailService.EmailSendAsync(message, cancellationToken);
-        }
-        catch (Exception e)
-        {
-            if (logger.IsEnabled(LogLevel.Error))
-                logger.LogError(e, "Failed to send password reset email to {Email}", email);
-            return Errors.Internal("Failed to send password reset email");
-        }
-
-        return Result.Success();
+        return await SendEmailAsync(email, "Сброс пароля",
+            BuildPasswordResetEmailHtml(resetLink, frontUrl, dateTimeProvider.UtcNow.Year),
+            cancellationToken);
     }
 
     public async Task<Result> ResetPasswordAsync(string userId, string token, string password,
@@ -285,8 +225,10 @@ public class AuthService(
         if (user is null)
             return Errors.Validation("ResetPassword", "Invalid reset link");
 
-        var decodedTokenBytes = WebEncoders.Base64UrlDecode(token);
-        var decodedToken = Encoding.UTF8.GetString(decodedTokenBytes);
+        string decodedToken;
+        try { decodedToken = DecodeBase64UrlToken(token); }
+        catch (FormatException) { return Errors.Validation("ResetPassword", "Invalid reset link"); }
+
         var result = await userManager.ResetPasswordAsync(user, decodedToken, password);
 
         if (!result.Succeeded)
@@ -311,7 +253,7 @@ public class AuthService(
               <p><a href="{safeLink}" style="display:inline-block;padding:10px 20px;background:#18181b;color:#fff;text-decoration:none;border-radius:6px">Сбросить пароль</a></p>
               <p style="color:#888;font-size:12px;margin-top:24px">Если вы не запрашивали сброс пароля, просто проигнорируйте это письмо.</p>
               <p style="color:#888;font-size:12px">Если кнопка не работает, скопируйте ссылку в браузер:</p>
-              <p style="color:#888;font-size:12px;word-break:break-all">{resetLink}</p>
+              <p style="color:#888;font-size:12px;word-break:break-all">{safeLink}</p>
               <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
               <p style="color:#aaa;font-size:11px;text-align:center;margin:0">
                 © {year} MCollector &nbsp;·&nbsp;
@@ -329,7 +271,7 @@ public class AuthService(
               <p>Спасибо за регистрацию! Нажмите на кнопку ниже, чтобы подтвердить ваш email:</p>
               <p><a href="{safeLink}" style="display:inline-block;padding:10px 20px;background:#18181b;color:#fff;text-decoration:none;border-radius:6px">Подтвердить email</a></p>
               <p style="color:#888;font-size:12px;margin-top:24px">Если кнопка не работает, скопируйте ссылку в браузер:</p>
-              <p style="color:#888;font-size:12px;word-break:break-all">{confirmationLink}</p>
+              <p style="color:#888;font-size:12px;word-break:break-all">{safeLink}</p>
               <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
               <p style="color:#aaa;font-size:11px;text-align:center;margin:0">
                 © {year} MCollector &nbsp;·&nbsp;
@@ -337,6 +279,46 @@ public class AuthService(
               </p>
             </div>
             """;
+    }
+
+    private string GetFrontendUrl()
+    {
+        var url = configuration["FrontendUrl"]
+            ?? throw new InvalidOperationException("FrontendUrl is not configured");
+        if (!url.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
+            !url.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("FrontendUrl must include the protocol (https://)");
+        return url;
+    }
+
+    private static string DecodeBase64UrlToken(string encoded)
+    {
+        var bytes = WebEncoders.Base64UrlDecode(encoded);
+        return Encoding.UTF8.GetString(bytes);
+    }
+
+    private async Task<Result> SendEmailAsync(string to, string subject, string html,
+        CancellationToken cancellationToken)
+    {
+        var message = new EmailMessage
+        {
+            From = SenderAddress,
+            Subject = subject,
+            HtmlBody = html
+        };
+        message.To.Add(to);
+
+        try
+        {
+            await emailService.EmailSendAsync(message, cancellationToken);
+            return Result.Success();
+        }
+        catch (Exception e)
+        {
+            if (logger.IsEnabled(LogLevel.Error))
+                logger.LogError(e, "Failed to send email to {To}", to);
+            return Errors.Internal("Failed to send email");
+        }
     }
 
     private async Task<AuthTokenDto> BuildTokenAsync(ApplicationUser user, CancellationToken cancellationToken)

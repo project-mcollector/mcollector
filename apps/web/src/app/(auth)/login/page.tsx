@@ -71,6 +71,7 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     setEmailUnconfirmed(false);
+    setResendDone(false);
 
     try {
       const res = await fetch(`${BASE_URL}/api/auth/login`, {
@@ -157,8 +158,8 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-              <label className={styles.label} style={{ marginBottom: 0 }}>Пароль</label>
+            <div className={styles.labelRow}>
+              <label className={styles.label}>Пароль</label>
               <Link href="/forgot-password" className={styles.link} style={{ fontSize: 13 }}>Забыли пароль?</Link>
             </div>
             <div className={styles.passwordWrapper}>

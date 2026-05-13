@@ -224,7 +224,6 @@ export default function ProjectsPage() {
       <div className={styles.page}>
         <div className={styles.header}>
           <h1 className={styles.title}>Мои проекты</h1>
-          <div className={styles.userInfo} />
         </div>
         <div className={styles.projectsGrid}>
           {[...Array(3)].map((_, i) => (

@@ -3,8 +3,9 @@ import { Resend } from "resend";
 
 export const runtime = "nodejs";
 
+const resend = new Resend(process.env.RESEND_APITOKEN);
+
 export async function POST(request: NextRequest) {
-  const resend = new Resend(process.env.RESEND_APITOKEN);
   const payload = await request.text();
 
   const headers = {

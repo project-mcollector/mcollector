@@ -38,7 +38,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092",
+          "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:29092",
         ]
       interval: 10s
       timeout: 10s
@@ -85,6 +85,7 @@ services:
     build:
       context: ../../apps/api
       dockerfile: src/Analytics.Api/Dockerfile
+    restart: unless-stopped
     ports:
       - "5002:8080"
     depends_on:
@@ -93,6 +94,7 @@ services:
     environment:
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=mcollector;Username=app;Password=app
       - Jwt__Secret=${JWT_SECRET:?JWT_SECRET must be set}
+      - AllowedOrigins=http://localhost:3000
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
       interval: 10s
@@ -113,6 +115,9 @@ services:
     environment:
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=mcollector;Username=app;Password=app
       - Jwt__Secret=${JWT_SECRET:?JWT_SECRET must be set}
+      - AllowedOrigins=http://localhost:3000
+      - RESEND_APITOKEN=${RESEND_APITOKEN:?RESEND_APITOKEN must be set}
+      - FrontendUrl=http://localhost:3000
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
       interval: 10s
@@ -139,11 +144,19 @@ services:
       context: ../../
       dockerfile: apps/web/Dockerfile
       args:
+        - NEXT_PUBLIC_BASE_URL=http://localhost:3000
         - NEXT_PUBLIC_IDENTITY_URL=http://localhost:5003
         - NEXT_PUBLIC_ANALYTICS_URL=http://localhost:5002
         - NEXT_PUBLIC_INGESTION_URL=http://localhost:5001
+        - NEXT_PUBLIC_ANALYTICS_API_KEY
+        - NEXT_PUBLIC_ANALYTICS_PROJECT_ID
+        - NEXT_PUBLIC_ANALYTICS_API_HOST
     environment:
       - INGESTION_INTERNAL_URL=http://ingestion:8080
+      - RESEND_APITOKEN=${RESEND_APITOKEN:?RESEND_APITOKEN must be set}
+      - RESEND_WEBHOOK_SECRET=${RESEND_WEBHOOK_SECRET:?RESEND_WEBHOOK_SECRET must be set}
+      - RESEND_FORWARD_TO=${RESEND_FORWARD_TO:?RESEND_FORWARD_TO must be set}
+      - RESEND_FORWARD_FROM=${RESEND_FORWARD_FROM:?RESEND_FORWARD_FROM must be set}
     ports:
       - "3000:3000"
     depends_on:

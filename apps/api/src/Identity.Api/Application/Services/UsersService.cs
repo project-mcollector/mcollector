@@ -42,13 +42,20 @@ public class UsersService(IdentityAppDbContext dbContext, UserManager<Applicatio
 
         if (user is null) return Errors.NotFound("User", userId);
 
+        await using var tx = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
         // Projects are not cascade-deleted when user is deleted, so remove them explicitly
         dbContext.Projects.RemoveRange(user.Projects);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         var result = await userManager.DeleteAsync(user);
-        return result.Succeeded
-            ? Result.Success()
-            : Errors.Internal(string.Join("; ", result.Errors.Select(e => e.Description)));
+        if (!result.Succeeded)
+        {
+            await tx.RollbackAsync(cancellationToken);
+            return Errors.Internal(string.Join("; ", result.Errors.Select(e => e.Description)));
+        }
+
+        await tx.CommitAsync(cancellationToken);
+        return Result.Success();
     }
 }

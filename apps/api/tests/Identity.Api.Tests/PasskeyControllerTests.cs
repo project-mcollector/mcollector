@@ -111,7 +111,7 @@ public class PasskeyControllerTests
         var user = new ApplicationUser { Id = TestUserId, Email = "user@acme.dev" };
         var passkeys = new List<PasskeyDto>
         {
-            new("AQID", DateTimeOffset.UtcNow, ["internal"], IsBackupEligible: false)
+            new("AQID", DateTimeOffset.UtcNow, ["internal"], IsBackupEligible: false, Aaguid: null)
         };
 
         var authService = new Mock<IAuthService>();

@@ -1,3 +1,4 @@
+using System.Text;
 using Identity.Api.Domain.Entities;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.AspNetCore.Identity;
@@ -33,7 +34,8 @@ public sealed record PasskeyDto(
     string CredentialId,
     DateTimeOffset CreatedAt,
     IReadOnlyList<string> Transports,
-    bool IsBackupEligible);
+    bool IsBackupEligible,
+    string? Aaguid);
 
 public sealed class PasskeyService(
     UserManager<ApplicationUser> userManager,
@@ -53,7 +55,8 @@ public sealed class PasskeyService(
                 WebEncoders.Base64UrlEncode(p.CredentialId),
                 p.CreatedAt,
                 p.Transports,
-                p.IsBackupEligible))
+                p.IsBackupEligible,
+                ExtractAaguid(p.AttestationObject)))
             .ToList();
         return list;
     }
@@ -145,5 +148,105 @@ public sealed class PasskeyService(
     {
         var passkeys = await userManager.GetPasskeysAsync(user);
         return passkeys.Count >= MaxPasskeysPerUser;
+    }
+
+    // Extracts the AAGUID from a WebAuthn attestation object (CBOR-encoded).
+    // The attestation object is a map: { "fmt": text, "attStmt": map, "authData": bytes }.
+    // authData layout: rpIdHash(32) | flags(1) | signCount(4) | aaguid(16) | ...
+    public static string? ExtractAaguid(byte[] attestationObject)
+    {
+        try
+        {
+            int pos = 0;
+            if (!TryReadCborMapHeader(attestationObject, ref pos, out int itemCount)) return null;
+
+            for (int i = 0; i < itemCount; i++)
+            {
+                string? key = TryReadCborTextString(attestationObject, ref pos);
+                if (key is null) return null;
+
+                if (key == "authData")
+                {
+                    byte[]? authData = TryReadCborByteString(attestationObject, ref pos);
+                    if (authData is null || authData.Length < 53) return null;
+                    if ((authData[32] & 0x40) == 0) return null; // AT flag not set
+
+                    var aaguid = new Guid(authData.AsSpan()[37..53], bigEndian: true);
+                    return aaguid == Guid.Empty ? null : aaguid.ToString();
+                }
+
+                SkipCborValue(attestationObject, ref pos);
+            }
+            return null;
+        }
+        catch { return null; }
+    }
+
+    private static bool TryReadCborMapHeader(byte[] d, ref int pos, out int count)
+    {
+        count = 0;
+        if (pos >= d.Length) return false;
+        byte b = d[pos++];
+        return (b >> 5) == 5 && TryReadCborLength(d, ref pos, b & 0x1F, out count);
+    }
+
+    private static string? TryReadCborTextString(byte[] d, ref int pos)
+    {
+        if (pos >= d.Length) return null;
+        byte b = d[pos++];
+        if ((b >> 5) != 3) return null;
+        if (!TryReadCborLength(d, ref pos, b & 0x1F, out int len) || pos + len > d.Length) return null;
+        var s = Encoding.UTF8.GetString(d, pos, len);
+        pos += len;
+        return s;
+    }
+
+    private static byte[]? TryReadCborByteString(byte[] d, ref int pos)
+    {
+        if (pos >= d.Length) return null;
+        byte b = d[pos++];
+        if ((b >> 5) != 2) return null;
+        if (!TryReadCborLength(d, ref pos, b & 0x1F, out int len) || pos + len > d.Length) return null;
+        var bytes = d[pos..(pos + len)];
+        pos += len;
+        return bytes;
+    }
+
+    private static bool TryReadCborLength(byte[] d, ref int pos, int info, out int length)
+    {
+        if (info < 24) { length = info; return true; }
+        if (info == 24) { if (pos >= d.Length) { length = 0; return false; } length = d[pos++]; return true; }
+        if (info == 25) { if (pos + 2 > d.Length) { length = 0; return false; } length = (d[pos] << 8) | d[pos + 1]; pos += 2; return true; }
+        if (info == 26) { if (pos + 4 > d.Length) { length = 0; return false; } length = (d[pos] << 24) | (d[pos + 1] << 16) | (d[pos + 2] << 8) | d[pos + 3]; pos += 4; return true; }
+        length = 0; return false;
+    }
+
+    private static void SkipCborValue(byte[] d, ref int pos)
+    {
+        if (pos >= d.Length) return;
+        byte b = d[pos++];
+        int mt = b >> 5, info = b & 0x1F;
+        switch (mt)
+        {
+            case 0: case 1: TryReadCborLength(d, ref pos, info, out _); break;
+            case 2:
+            case 3:
+                if (TryReadCborLength(d, ref pos, info, out int sLen)) pos += sLen;
+                break;
+            case 4:
+                if (TryReadCborLength(d, ref pos, info, out int aLen))
+                    for (int i = 0; i < aLen; i++) SkipCborValue(d, ref pos);
+                break;
+            case 5:
+                if (TryReadCborLength(d, ref pos, info, out int mLen))
+                    for (int i = 0; i < mLen * 2; i++) SkipCborValue(d, ref pos);
+                break;
+            case 6: SkipCborValue(d, ref pos); break;
+            case 7:
+                if (info == 25) pos += 2;
+                else if (info == 26) pos += 4;
+                else if (info == 27) pos += 8;
+                break;
+        }
     }
 }

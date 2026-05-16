@@ -55,6 +55,51 @@ public class PasskeyServiceTests
         clientDataJson: [7, 8, 9],
         attestationObject: [10, 11, 12]);
 
+    // ExtractAaguid
+
+    [Fact]
+    public void ExtractAaguid_ValidAttestationObject_ReturnsAaguidString()
+    {
+        // Build a minimal CBOR attestation object:
+        //   A2 ("fmt" → "none", "authData" → bytes)
+        // authData: 32-byte rpIdHash | flags=0x45 (UP+UV+AT) | signCount(4) | aaguid(16) | ...
+        var rpIdHash = new byte[32]; // all zeros for test
+        byte flags = 0x45; // UP | UV | AT set
+        var signCount = new byte[4];
+        // Use Apple iCloud Keychain AAGUID: fbfc3007-154e-4ecc-8c0b-6e020557d7bd
+        var aaguid = new byte[] { 0xfb, 0xfc, 0x30, 0x07, 0x15, 0x4e, 0x4e, 0xcc, 0x8c, 0x0b, 0x6e, 0x02, 0x05, 0x57, 0xd7, 0xbd };
+        // Minimal credential data suffix (credId length = 0)
+        var credIdLen = new byte[] { 0x00, 0x01 };
+        var credId = new byte[] { 0xAB };
+        var authData = rpIdHash.Concat(new[] { flags }).Concat(signCount).Concat(aaguid).Concat(credIdLen).Concat(credId).ToArray();
+
+        // CBOR: A2 (map 2 entries)
+        //   63 "fmt" → 64 "none"
+        //   68 "authData" → 5A <4-byte len> <authData bytes>
+        var fmtKey = new byte[] { 0x63, 0x66, 0x6D, 0x74 };               // text(3) "fmt"
+        var fmtVal = new byte[] { 0x64, 0x6E, 0x6F, 0x6E, 0x65 };         // text(4) "none"
+        var adKey = new byte[] { 0x68, 0x61, 0x75, 0x74, 0x68, 0x44, 0x61, 0x74, 0x61 }; // text(8) "authData"
+        // bytes(len): major type 2, 4-byte length (info=26)
+        int adLen = authData.Length;
+        var adLenBytes = new byte[] { (byte)(adLen >> 24), (byte)(adLen >> 16), (byte)(adLen >> 8), (byte)adLen };
+        var adHeader = new byte[] { 0x5A }.Concat(adLenBytes).ToArray();   // bytes(26 → 4-byte len)
+
+        var attestationObject = new byte[] { 0xA2 }
+            .Concat(fmtKey).Concat(fmtVal)
+            .Concat(adKey).Concat(adHeader).Concat(authData)
+            .ToArray();
+
+        var result = PasskeyService.ExtractAaguid(attestationObject);
+
+        Assert.Equal("fbfc3007-154e-4ecc-8c0b-6e020557d7bd", result);
+    }
+
+    [Fact]
+    public void ExtractAaguid_InvalidBytes_ReturnsNull()
+    {
+        Assert.Null(PasskeyService.ExtractAaguid([10, 11, 12]));
+    }
+
     // BeginLoginAsync
 
     [Fact]
@@ -352,5 +397,6 @@ public class PasskeyServiceTests
         Assert.Equal(passkey.CreatedAt, result.Value[0].CreatedAt);
         Assert.Equal(passkey.Transports, result.Value[0].Transports);
         Assert.Equal(passkey.IsBackupEligible, result.Value[0].IsBackupEligible);
+        Assert.Null(result.Value[0].Aaguid); // dummy attestation bytes don't parse
     }
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/auth";
 import { localizeErrorMessage } from "@/lib/errorLocalization";
+import { getPasskeyLabel } from "@/lib/passkeyLabels";
 import { Button } from "@/components/ui/button";
 
 function base64urlToBuffer(base64url: string): ArrayBuffer {
@@ -42,15 +43,7 @@ interface PasskeyInfo {
   createdAt: string;
   transports: string[];
   isBackupEligible: boolean;
-}
-
-function getPasskeyLabel(transports: string[], isBackupEligible: boolean): string {
-  if (isBackupEligible) return "Синхронизированный ключ";
-  if (transports.some((t) => ["usb", "nfc", "ble", "smart-card"].includes(t)))
-    return "Аппаратный ключ";
-  if (transports.includes("hybrid")) return "Другое устройство";
-  if (transports.includes("internal")) return "Этот браузер";
-  return "Устройство";
+  aaguid: string | null;
 }
 
 const MAX_PASSKEYS = 5;
@@ -236,7 +229,7 @@ export default function SettingsPage() {
               {passkeys.map((passkey) => (
                 <li key={passkey.credentialId} className="flex items-center justify-between gap-2 px-6 py-2.5 text-sm">
                   <div>
-                    <span className="font-medium">{getPasskeyLabel(passkey.transports, passkey.isBackupEligible)}</span>
+                    <span className="font-medium">{getPasskeyLabel(passkey.aaguid, passkey.transports, passkey.isBackupEligible)}</span>
                     <span className="text-muted-foreground"> — создан {new Date(passkey.createdAt).toLocaleString("ru-RU")}</span>
                   </div>
                   <Button

@@ -29,7 +29,11 @@ public interface IPasskeyService
         CancellationToken cancellationToken = default);
 }
 
-public sealed record PasskeyDto(string CredentialId, DateTimeOffset CreatedAt);
+public sealed record PasskeyDto(
+    string CredentialId,
+    DateTimeOffset CreatedAt,
+    IReadOnlyList<string> Transports,
+    bool IsBackupEligible);
 
 public sealed class PasskeyService(
     UserManager<ApplicationUser> userManager,
@@ -45,7 +49,11 @@ public sealed class PasskeyService(
     {
         var passkeys = await userManager.GetPasskeysAsync(user);
         var list = passkeys
-            .Select(p => new PasskeyDto(WebEncoders.Base64UrlEncode(p.CredentialId), p.CreatedAt))
+            .Select(p => new PasskeyDto(
+                WebEncoders.Base64UrlEncode(p.CredentialId),
+                p.CreatedAt,
+                p.Transports,
+                p.IsBackupEligible))
             .ToList();
         return list;
     }

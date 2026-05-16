@@ -350,5 +350,7 @@ public class PasskeyServiceTests
         Assert.Single(result.Value);
         Assert.Equal("AQID", result.Value[0].CredentialId);
         Assert.Equal(passkey.CreatedAt, result.Value[0].CreatedAt);
+        Assert.Equal(passkey.Transports, result.Value[0].Transports);
+        Assert.Equal(passkey.IsBackupEligible, result.Value[0].IsBackupEligible);
     }
 }

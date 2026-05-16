@@ -40,6 +40,17 @@ interface PasskeyCreationOptionsPayload {
 interface PasskeyInfo {
   credentialId: string;
   createdAt: string;
+  transports: string[];
+  isBackupEligible: boolean;
+}
+
+function getPasskeyLabel(transports: string[], isBackupEligible: boolean): string {
+  if (isBackupEligible) return "Синхронизированный ключ";
+  if (transports.some((t) => ["usb", "nfc", "ble", "smart-card"].includes(t)))
+    return "Аппаратный ключ";
+  if (transports.includes("hybrid")) return "Другое устройство";
+  if (transports.includes("internal")) return "Этот браузер";
+  return "Устройство";
 }
 
 const MAX_PASSKEYS = 5;
@@ -212,42 +223,36 @@ export default function SettingsPage() {
         <h2 className="mb-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Безопасность
         </h2>
-        <div className="rounded-lg border p-6">
+        <div className="rounded-lg bg-sidebar p-6">
           <h3 className="font-medium mb-1">Passkey</h3>
           <p className="text-sm text-muted-foreground mb-4">
             Входите без пароля с помощью биометрии или PIN-кода вашего устройства.
           </p>
 
           {loadingPasskeys ? (
-            <p className="text-sm text-muted-foreground mb-3">Загрузка passkey…</p>
+            <p className="text-sm text-muted-foreground mb-4">Загрузка passkey…</p>
           ) : passkeys.length > 0 ? (
-            <div className="mb-3 rounded-md border bg-muted/30 p-3 text-sm">
-              <p className="font-medium mb-2">Созданные passkey</p>
-              <p className="text-xs text-muted-foreground mb-2">
-                {passkeys.length} / {MAX_PASSKEYS}
-              </p>
-              <ul className="space-y-1">
-                {passkeys.map((passkey) => (
-                  <li key={passkey.credentialId} className="flex items-center justify-between gap-2">
-                    <div>
-                      <span className="font-mono text-xs">{passkey.credentialId.slice(0, 8)}…</span>
-                      <span className="text-muted-foreground"> — создан {new Date(passkey.createdAt).toLocaleString("ru-RU")}</span>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => void handleDeletePasskey(passkey.credentialId)}
-                      disabled={deletingId === passkey.credentialId}
-                      className="shrink-0 text-destructive hover:text-destructive"
-                    >
-                      {deletingId === passkey.credentialId ? "…" : "Удалить"}
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <ul className="mb-4 divide-y divide-border -mx-6">
+              {passkeys.map((passkey) => (
+                <li key={passkey.credentialId} className="flex items-center justify-between gap-2 px-6 py-2.5 text-sm">
+                  <div>
+                    <span className="font-medium">{getPasskeyLabel(passkey.transports, passkey.isBackupEligible)}</span>
+                    <span className="text-muted-foreground"> — создан {new Date(passkey.createdAt).toLocaleString("ru-RU")}</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void handleDeletePasskey(passkey.credentialId)}
+                    disabled={deletingId === passkey.credentialId}
+                    className="shrink-0 text-destructive hover:text-destructive"
+                  >
+                    {deletingId === passkey.credentialId ? "…" : "Удалить"}
+                  </Button>
+                </li>
+              ))}
+            </ul>
           ) : (
-            <p className="text-sm text-muted-foreground mb-3">Passkey пока не добавлен.</p>
+            <p className="text-sm text-muted-foreground mb-4">Passkey пока не добавлен.</p>
           )}
 
           {status === "success" && (
@@ -257,17 +262,22 @@ export default function SettingsPage() {
             <p className="text-sm text-destructive mb-3">{errorMessage}</p>
           )}
 
-          <Button
-            variant="outline"
-            onClick={handleCreatePasskey}
-            disabled={loading || loadingPasskeys || !passkeySupported || passkeys.length >= MAX_PASSKEYS}
-          >
-            {loading
-              ? "Ожидание устройства…"
-              : passkeys.length >= MAX_PASSKEYS
-                ? "Достигнут лимит passkey"
-                : "Добавить passkey"}
-          </Button>
+          <div className="flex items-center justify-between gap-4">
+            <Button
+              variant="outline"
+              onClick={handleCreatePasskey}
+              disabled={loading || loadingPasskeys || !passkeySupported || passkeys.length >= MAX_PASSKEYS}
+            >
+              {loading
+                ? "Ожидание устройства…"
+                : passkeys.length >= MAX_PASSKEYS
+                  ? "Достигнут лимит passkey"
+                  : "Добавить passkey"}
+            </Button>
+            {!loadingPasskeys && (
+              <span className="text-xs text-muted-foreground">{passkeys.length} / {MAX_PASSKEYS}</span>
+            )}
+          </div>
 
           {!passkeySupported && (
             <p className="mt-2 text-xs text-muted-foreground">

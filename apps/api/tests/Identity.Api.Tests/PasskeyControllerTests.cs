@@ -93,6 +93,103 @@ public class PasskeyControllerTests
         Assert.Equal("refresh-token", dto.RefreshToken);
     }
 
+    // GetPasskeys
+
+    [Fact]
+    public async Task GetPasskeys_NoClaimsPrincipal_ReturnsUnauthorized()
+    {
+        var (controller, _) = CreateController(new Mock<IAuthService>());
+
+        var result = await controller.GetPasskeys();
+
+        Assert.IsType<UnauthorizedResult>(result);
+    }
+
+    [Fact]
+    public async Task GetPasskeys_AuthenticatedUser_ReturnsOkWithPasskeys()
+    {
+        var user = new ApplicationUser { Id = TestUserId, Email = "user@acme.dev" };
+        var passkeys = new List<PasskeyDto>
+        {
+            new("AQID", DateTimeOffset.UtcNow)
+        };
+
+        var authService = new Mock<IAuthService>();
+        authService.Setup(x => x.GetPasskeysAsync(It.IsAny<ApplicationUser>()))
+            .ReturnsAsync(passkeys);
+
+        var (controller, userManager) = CreateController(authService, userId: TestUserId);
+        userManager.Setup(x => x.FindByIdAsync(TestUserId)).ReturnsAsync(user);
+
+        var result = await controller.GetPasskeys();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var value = Assert.IsAssignableFrom<IReadOnlyList<PasskeyDto>>(ok.Value);
+        Assert.Single(value);
+        Assert.Equal("AQID", value[0].CredentialId);
+    }
+
+    [Fact]
+    public async Task GetPasskeys_ServiceFailure_ReturnsInternalServerError()
+    {
+        var user = new ApplicationUser { Id = TestUserId };
+        var authService = new Mock<IAuthService>();
+        authService.Setup(x => x.GetPasskeysAsync(It.IsAny<ApplicationUser>()))
+            .ReturnsAsync(Errors.Internal("storage failure"));
+
+        var (controller, userManager) = CreateController(authService, userId: TestUserId);
+        userManager.Setup(x => x.FindByIdAsync(TestUserId)).ReturnsAsync(user);
+
+        var result = await controller.GetPasskeys();
+
+        var obj = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(500, obj.StatusCode);
+    }
+
+    // DeletePasskey
+
+    [Fact]
+    public async Task DeletePasskey_NoClaimsPrincipal_ReturnsUnauthorized()
+    {
+        var (controller, _) = CreateController(new Mock<IAuthService>());
+
+        var result = await controller.DeletePasskey("AQID");
+
+        Assert.IsType<UnauthorizedResult>(result);
+    }
+
+    [Fact]
+    public async Task DeletePasskey_ExistingCredential_ReturnsNoContent()
+    {
+        var user = new ApplicationUser { Id = TestUserId };
+        var authService = new Mock<IAuthService>();
+        authService.Setup(x => x.DeletePasskeyAsync(It.IsAny<ApplicationUser>(), "AQID"))
+            .ReturnsAsync(Result.Success());
+
+        var (controller, userManager) = CreateController(authService, userId: TestUserId);
+        userManager.Setup(x => x.FindByIdAsync(TestUserId)).ReturnsAsync(user);
+
+        var result = await controller.DeletePasskey("AQID");
+
+        Assert.IsType<NoContentResult>(result);
+    }
+
+    [Fact]
+    public async Task DeletePasskey_NotFound_Returns404()
+    {
+        var user = new ApplicationUser { Id = TestUserId };
+        var authService = new Mock<IAuthService>();
+        authService.Setup(x => x.DeletePasskeyAsync(It.IsAny<ApplicationUser>(), "AQID"))
+            .ReturnsAsync(Errors.NotFound("Passkey", "AQID"));
+
+        var (controller, userManager) = CreateController(authService, userId: TestUserId);
+        userManager.Setup(x => x.FindByIdAsync(TestUserId)).ReturnsAsync(user);
+
+        var result = await controller.DeletePasskey("AQID");
+
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
     // GetPasskeyRegistrationOptions
 
     [Fact]

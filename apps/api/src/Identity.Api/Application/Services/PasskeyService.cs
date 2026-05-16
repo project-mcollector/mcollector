@@ -1,4 +1,5 @@
 using Identity.Api.Domain.Entities;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.AspNetCore.Identity;
 using Utilities;
 
@@ -6,6 +7,12 @@ namespace Identity.Api.Application.Services;
 
 public interface IPasskeyService
 {
+    Task<Result<IReadOnlyList<PasskeyDto>>> ListAsync(ApplicationUser user,
+        CancellationToken cancellationToken = default);
+
+    Task<Result> DeleteAsync(ApplicationUser user, string credentialId,
+        CancellationToken cancellationToken = default);
+
     Task<Result<string>> BeginRegistrationAsync(ApplicationUser user,
         CancellationToken cancellationToken = default);
 
@@ -22,6 +29,8 @@ public interface IPasskeyService
         CancellationToken cancellationToken = default);
 }
 
+public sealed record PasskeyDto(string CredentialId, DateTimeOffset CreatedAt);
+
 public sealed class PasskeyService(
     UserManager<ApplicationUser> userManager,
     SignInManager<ApplicationUser> signInManager,
@@ -29,9 +38,45 @@ public sealed class PasskeyService(
     ILogger<PasskeyService>? logger = null)
     : IPasskeyService
 {
+    private const int MaxPasskeysPerUser = 5;
+
+    public async Task<Result<IReadOnlyList<PasskeyDto>>> ListAsync(ApplicationUser user,
+        CancellationToken cancellationToken = default)
+    {
+        var passkeys = await userManager.GetPasskeysAsync(user);
+        var list = passkeys
+            .Select(p => new PasskeyDto(WebEncoders.Base64UrlEncode(p.CredentialId), p.CreatedAt))
+            .ToList();
+        return list;
+    }
+
+    public async Task<Result> DeleteAsync(ApplicationUser user, string credentialId,
+        CancellationToken cancellationToken = default)
+    {
+        byte[] credentialIdBytes;
+        try
+        {
+            credentialIdBytes = WebEncoders.Base64UrlDecode(credentialId);
+        }
+        catch (FormatException)
+        {
+            return Errors.Validation("Passkey", "Invalid credential ID");
+        }
+
+        var passkeys = await userManager.GetPasskeysAsync(user);
+        if (!passkeys.Any(p => p.CredentialId.SequenceEqual(credentialIdBytes)))
+            return Errors.NotFound("Passkey", credentialId);
+
+        await userManager.RemovePasskeyAsync(user, credentialIdBytes);
+        return Result.Success();
+    }
+
     public async Task<Result<string>> BeginRegistrationAsync(ApplicationUser user,
         CancellationToken cancellationToken = default)
     {
+        if (await HasReachedPasskeyLimitAsync(user))
+            return Errors.Conflict($"Passkey limit reached ({MaxPasskeysPerUser}) for this account");
+
         var userEntity = new PasskeyUserEntity
         {
             Id = user.Id,
@@ -45,6 +90,9 @@ public sealed class PasskeyService(
     public async Task<Result> CompleteRegistrationAsync(ApplicationUser user, string credentialJson,
         CancellationToken cancellationToken = default)
     {
+        if (await HasReachedPasskeyLimitAsync(user))
+            return Errors.Conflict($"Passkey limit reached ({MaxPasskeysPerUser}) for this account");
+
         var attestation = await signInManager.PerformPasskeyAttestationAsync(credentialJson);
         if (!attestation.Succeeded)
         {
@@ -83,5 +131,11 @@ public sealed class PasskeyService(
         }
 
         return await tokenService.CreateTokenAsync(result.User, cancellationToken);
+    }
+
+    private async Task<bool> HasReachedPasskeyLimitAsync(ApplicationUser user)
+    {
+        var passkeys = await userManager.GetPasskeysAsync(user);
+        return passkeys.Count >= MaxPasskeysPerUser;
     }
 }

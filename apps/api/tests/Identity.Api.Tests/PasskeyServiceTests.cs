@@ -31,6 +31,8 @@ public class PasskeyServiceTests
             new Mock<IUserConfirmation<ApplicationUser>>().Object);
 
         var ts = new Mock<ITokenService>();
+        um.Setup(x => x.GetPasskeysAsync(It.IsAny<ApplicationUser>()))
+            .ReturnsAsync([]);
         return (um, sm, ts);
     }
 
@@ -166,6 +168,43 @@ public class PasskeyServiceTests
         Assert.True(result.IsSuccess);
     }
 
+    [Fact]
+    public async Task BeginRegistrationAsync_BelowLimit_AllowsCreatingOnAnotherDevice()
+    {
+        var user = CreateUser();
+        var existing = CreateDummyPasskeyInfo();
+        const string optionsJson = "{\"challenge\":\"reg\"}";
+        var (um, sm, ts) = CreateMocks();
+        um.Setup(x => x.GetPasskeysAsync(user))
+            .ReturnsAsync([existing]);
+        sm.Setup(x => x.MakePasskeyCreationOptionsAsync(It.IsAny<PasskeyUserEntity>()))
+            .ReturnsAsync(optionsJson);
+
+        var service = new PasskeyService(um.Object, sm.Object, ts.Object);
+        var result = await service.BeginRegistrationAsync(user);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(optionsJson, result.Value);
+        sm.Verify(x => x.MakePasskeyCreationOptionsAsync(It.IsAny<PasskeyUserEntity>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task BeginRegistrationAsync_AtLimit_ReturnsConflict()
+    {
+        var user = CreateUser();
+        var existing = Enumerable.Range(0, 5).Select(_ => CreateDummyPasskeyInfo()).ToList();
+        var (um, sm, ts) = CreateMocks();
+        um.Setup(x => x.GetPasskeysAsync(user))
+            .ReturnsAsync(existing);
+
+        var service = new PasskeyService(um.Object, sm.Object, ts.Object);
+        var result = await service.BeginRegistrationAsync(user);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Conflict", result.Error?.Id);
+        sm.Verify(x => x.MakePasskeyCreationOptionsAsync(It.IsAny<PasskeyUserEntity>()), Times.Never);
+    }
+
     // CompleteRegistrationAsync
 
     [Fact]
@@ -204,5 +243,112 @@ public class PasskeyServiceTests
 
         Assert.True(result.IsSuccess);
         um.Verify(x => x.AddOrUpdatePasskeyAsync(user, passkey), Times.Once);
+    }
+
+    [Fact]
+    public async Task CompleteRegistrationAsync_BelowLimit_AllowsCreatingOnAnotherDevice()
+    {
+        var user = CreateUser();
+        var passkey = CreateDummyPasskeyInfo();
+        var existing = CreateDummyPasskeyInfo();
+        var userEntity = new PasskeyUserEntity { Id = user.Id, Name = user.UserName, DisplayName = user.Email };
+        var successfulAttestation = PasskeyAttestationResult.Success(passkey, userEntity);
+        var (um, sm, ts) = CreateMocks();
+        um.Setup(x => x.GetPasskeysAsync(user))
+            .ReturnsAsync([existing]);
+        sm.Setup(x => x.PerformPasskeyAttestationAsync("valid-cred"))
+            .ReturnsAsync(successfulAttestation);
+        um.Setup(x => x.AddOrUpdatePasskeyAsync(user, passkey))
+            .ReturnsAsync(IdentityResult.Success);
+
+        var service = new PasskeyService(um.Object, sm.Object, ts.Object);
+        var result = await service.CompleteRegistrationAsync(user, "valid-cred");
+
+        Assert.True(result.IsSuccess);
+        um.Verify(x => x.AddOrUpdatePasskeyAsync(user, passkey), Times.Once);
+    }
+
+    [Fact]
+    public async Task CompleteRegistrationAsync_AtLimit_ReturnsConflict()
+    {
+        var user = CreateUser();
+        var existing = Enumerable.Range(0, 5).Select(_ => CreateDummyPasskeyInfo()).ToList();
+        var (um, sm, ts) = CreateMocks();
+        um.Setup(x => x.GetPasskeysAsync(user))
+            .ReturnsAsync(existing);
+
+        var service = new PasskeyService(um.Object, sm.Object, ts.Object);
+        var result = await service.CompleteRegistrationAsync(user, "valid-cred");
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Conflict", result.Error?.Id);
+        sm.Verify(x => x.PerformPasskeyAttestationAsync(It.IsAny<string>()), Times.Never);
+        um.Verify(x => x.AddOrUpdatePasskeyAsync(It.IsAny<ApplicationUser>(), It.IsAny<UserPasskeyInfo>()), Times.Never);
+    }
+
+    // DeleteAsync
+
+    [Fact]
+    public async Task DeleteAsync_InvalidBase64_ReturnsValidation()
+    {
+        var user = CreateUser();
+        var (um, sm, ts) = CreateMocks();
+
+        var service = new PasskeyService(um.Object, sm.Object, ts.Object);
+        var result = await service.DeleteAsync(user, "not-valid-base64!!!");
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Validation.Passkey", result.Error?.Id);
+        um.Verify(x => x.RemovePasskeyAsync(It.IsAny<ApplicationUser>(), It.IsAny<byte[]>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_PasskeyNotOwnedByUser_ReturnsNotFound()
+    {
+        var user = CreateUser();
+        var (um, sm, ts) = CreateMocks();
+        // default mock returns empty list
+
+        var service = new PasskeyService(um.Object, sm.Object, ts.Object);
+        var result = await service.DeleteAsync(user, "AQID");
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Passkey.NotFound", result.Error?.Id);
+        um.Verify(x => x.RemovePasskeyAsync(It.IsAny<ApplicationUser>(), It.IsAny<byte[]>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_OwnedPasskey_CallsRemoveAndReturnsSuccess()
+    {
+        var user = CreateUser();
+        var passkey = CreateDummyPasskeyInfo(); // credentialId = [1,2,3] → "AQID"
+        var (um, sm, ts) = CreateMocks();
+        um.Setup(x => x.GetPasskeysAsync(user)).ReturnsAsync([passkey]);
+        um.Setup(x => x.RemovePasskeyAsync(user, It.Is<byte[]>(b => b.SequenceEqual(new byte[] { 1, 2, 3 }))))
+            .ReturnsAsync(IdentityResult.Success);
+
+        var service = new PasskeyService(um.Object, sm.Object, ts.Object);
+        var result = await service.DeleteAsync(user, "AQID");
+
+        Assert.True(result.IsSuccess);
+        um.Verify(x => x.RemovePasskeyAsync(user, It.Is<byte[]>(b => b.SequenceEqual(new byte[] { 1, 2, 3 }))), Times.Once);
+    }
+
+    [Fact]
+    public async Task ListAsync_ReturnsMappedPasskeys()
+    {
+        var user = CreateUser();
+        var passkey = CreateDummyPasskeyInfo();
+        var (um, sm, ts) = CreateMocks();
+        um.Setup(x => x.GetPasskeysAsync(user))
+            .ReturnsAsync([passkey]);
+
+        var service = new PasskeyService(um.Object, sm.Object, ts.Object);
+        var result = await service.ListAsync(user);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value);
+        Assert.Equal("AQID", result.Value[0].CredentialId);
+        Assert.Equal(passkey.CreatedAt, result.Value[0].CreatedAt);
     }
 }

@@ -60,6 +60,39 @@ public class AuthController(IAuthService authService, UserManager<ApplicationUse
     }
 
     [Authorize]
+    [HttpGet("passkey")]
+    [EnableRateLimiting("api")]
+    [ProducesResponseType(typeof(IReadOnlyList<PasskeyDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetPasskeys()
+    {
+        var user = await GetCurrentUserAsync();
+        if (user is null) return Unauthorized();
+
+        var result = await authService.GetPasskeysAsync(user);
+        return result.IsSuccess
+            ? Ok(result.Value)
+            : StatusCode(StatusCodes.Status500InternalServerError, result.Error.Description);
+    }
+
+    [Authorize]
+    [HttpDelete("passkey/{credentialId}")]
+    [EnableRateLimiting("api")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeletePasskey(string credentialId)
+    {
+        var user = await GetCurrentUserAsync();
+        if (user is null) return Unauthorized();
+
+        var result = await authService.DeletePasskeyAsync(user, credentialId);
+        return result.IsSuccess ? NoContent() :
+            result.Error.Id.EndsWith(".NotFound") ? NotFound(result.Error.Description) :
+            BadRequest(result.Error.Description);
+    }
+
+    [Authorize]
     [HttpPost("passkey/register/options")]
     [EnableRateLimiting("api")]
     [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]

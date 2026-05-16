@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/auth";
+import { localizeErrorMessage } from "@/lib/errorLocalization";
 import { Button } from "@/components/ui/button";
 
 function base64urlToBuffer(base64url: string): ArrayBuffer {
@@ -36,13 +37,86 @@ interface PasskeyCreationOptionsPayload {
   [key: string]: unknown;
 }
 
+interface PasskeyInfo {
+  credentialId: string;
+  createdAt: string;
+}
+
+const MAX_PASSKEYS = 5;
+
 export default function SettingsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [loadingPasskeys, setLoadingPasskeys] = useState(true);
+  const [passkeys, setPasskeys] = useState<PasskeyInfo[]>([]);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
+  async function getPasskeys(): Promise<PasskeyInfo[]> {
+    const res = await authFetch("/api/auth/passkey", router);
+    return (await res.json()) as PasskeyInfo[];
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const init = async () => {
+      try {
+        const data = await getPasskeys();
+        if (!cancelled) setPasskeys(data);
+      } catch (err) {
+        if (!cancelled) {
+          setStatus("error");
+          setErrorMessage(
+            err instanceof Error
+              ? localizeErrorMessage(err.message)
+              : localizeErrorMessage(""),
+          );
+        }
+      } finally {
+        if (!cancelled) setLoadingPasskeys(false);
+      }
+    };
+
+    void init();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
+  useEffect(() => {
+    if (status !== "success") return;
+    const id = setTimeout(() => setStatus("idle"), 3000);
+    return () => clearTimeout(id);
+  }, [status]);
+
+  async function handleDeletePasskey(credentialId: string) {
+    setDeletingId(credentialId);
+    setStatus("idle");
+    setErrorMessage("");
+    try {
+      await authFetch(`/api/auth/passkey/${encodeURIComponent(credentialId)}`, router, {
+        method: "DELETE",
+      });
+      setPasskeys((prev) => prev.filter((p) => p.credentialId !== credentialId));
+    } catch (err) {
+      setStatus("error");
+      setErrorMessage(
+        err instanceof Error ? localizeErrorMessage(err.message) : localizeErrorMessage(""),
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   async function handleCreatePasskey() {
+    if (passkeys.length >= MAX_PASSKEYS) {
+      setStatus("error");
+      setErrorMessage(`Достигнут лимит passkey (${MAX_PASSKEYS}).`);
+      return;
+    }
+
     setLoading(true);
     setStatus("idle");
     setErrorMessage("");
@@ -100,20 +174,27 @@ export default function SettingsPage() {
         body: JSON.stringify({ credentialJson }),
       });
 
+      try {
+        setPasskeys(await getPasskeys());
+      } catch {
+        // list refresh failed; passkey was still registered
+      }
       setStatus("success");
     } catch (err) {
       if (err instanceof DOMException && err.name === "NotAllowedError") {
         // user cancelled — stay idle
       } else {
         setStatus("error");
-        if (err instanceof DOMException && err.name === "SecurityError") {
+        if (err instanceof DOMException && err.name === "InvalidStateError") {
+          setErrorMessage("Passkey для этого аккаунта уже существует на текущем устройстве.");
+        } else if (err instanceof DOMException && err.name === "SecurityError") {
           setErrorMessage(
             "Ошибка безопасности браузера. Убедитесь, что сайт открыт по HTTPS и Passkey__ServerDomain совпадает с доменом сайта."
           );
-        } else if (err instanceof Error && err.message.trim()) {
-          setErrorMessage(err.message);
         } else {
-          setErrorMessage("Что-то пошло не так. Попробуйте ещё раз.");
+          setErrorMessage(
+            err instanceof Error ? localizeErrorMessage(err.message) : localizeErrorMessage(""),
+          );
         }
       }
     } finally {
@@ -137,6 +218,38 @@ export default function SettingsPage() {
             Входите без пароля с помощью биометрии или PIN-кода вашего устройства.
           </p>
 
+          {loadingPasskeys ? (
+            <p className="text-sm text-muted-foreground mb-3">Загрузка passkey…</p>
+          ) : passkeys.length > 0 ? (
+            <div className="mb-3 rounded-md border bg-muted/30 p-3 text-sm">
+              <p className="font-medium mb-2">Созданные passkey</p>
+              <p className="text-xs text-muted-foreground mb-2">
+                {passkeys.length} / {MAX_PASSKEYS}
+              </p>
+              <ul className="space-y-1">
+                {passkeys.map((passkey) => (
+                  <li key={passkey.credentialId} className="flex items-center justify-between gap-2">
+                    <div>
+                      <span className="font-mono text-xs">{passkey.credentialId.slice(0, 8)}…</span>
+                      <span className="text-muted-foreground"> — создан {new Date(passkey.createdAt).toLocaleString("ru-RU")}</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void handleDeletePasskey(passkey.credentialId)}
+                      disabled={deletingId === passkey.credentialId}
+                      className="shrink-0 text-destructive hover:text-destructive"
+                    >
+                      {deletingId === passkey.credentialId ? "…" : "Удалить"}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground mb-3">Passkey пока не добавлен.</p>
+          )}
+
           {status === "success" && (
             <p className="text-sm text-green-600 mb-3">Passkey успешно добавлен.</p>
           )}
@@ -147,9 +260,13 @@ export default function SettingsPage() {
           <Button
             variant="outline"
             onClick={handleCreatePasskey}
-            disabled={loading || !passkeySupported}
+            disabled={loading || loadingPasskeys || !passkeySupported || passkeys.length >= MAX_PASSKEYS}
           >
-            {loading ? "Ожидание устройства…" : "Добавить passkey"}
+            {loading
+              ? "Ожидание устройства…"
+              : passkeys.length >= MAX_PASSKEYS
+                ? "Достигнут лимит passkey"
+                : "Добавить passkey"}
           </Button>
 
           {!passkeySupported && (

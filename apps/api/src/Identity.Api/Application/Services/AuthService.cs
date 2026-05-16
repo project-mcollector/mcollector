@@ -19,6 +19,8 @@ public interface IAuthService
 
     Task<Result<string>> BeginPasskeyRegistrationAsync(ApplicationUser user);
     Task<Result> CompletePasskeyRegistrationAsync(ApplicationUser user, string credentialJson);
+    Task<Result<IReadOnlyList<PasskeyDto>>> GetPasskeysAsync(ApplicationUser user);
+    Task<Result> DeletePasskeyAsync(ApplicationUser user, string credentialId);
     Task<Result<string>> BeginPasskeyLoginAsync(string email);
     Task<Result<string>> BeginDiscoverablePasskeyLoginAsync();
     Task<Result<AuthTokenDto>> CompletePasskeyLoginAsync(string credentialJson);
@@ -110,6 +112,12 @@ public class AuthService(
 
     public async Task<Result> CompletePasskeyRegistrationAsync(ApplicationUser user, string credentialJson)
         => await passkeyService.CompleteRegistrationAsync(user, credentialJson);
+
+    public async Task<Result<IReadOnlyList<PasskeyDto>>> GetPasskeysAsync(ApplicationUser user)
+        => await passkeyService.ListAsync(user);
+
+    public async Task<Result> DeletePasskeyAsync(ApplicationUser user, string credentialId)
+        => await passkeyService.DeleteAsync(user, credentialId);
 
     public async Task<Result<string>> BeginPasskeyLoginAsync(string email)
         => await passkeyService.BeginLoginAsync(email);

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { BASE_URL } from "@/lib/constants";
+import { isTokenFresh } from "@/lib/auth";
 import styles from "../login.module.css";
 import IntegrationCard from "../IntegrationCard";
 
@@ -56,15 +57,6 @@ function bufferToBase64url(buffer: ArrayBuffer): string {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
-function isTokenFresh(token: string): boolean {
-  try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return typeof payload.exp === "number" && payload.exp * 1000 > Date.now();
-  } catch {
-    return false;
-  }
-}
-
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -114,7 +106,16 @@ export default function LoginPage() {
     checkSession();
   }, [router]);
 
-  if (!ready) return null;
+  if (!ready) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.card}>
+          <h1 className={styles.title}>MCollector</h1>
+          <p className={styles.subtitle}>Загрузка...</p>
+        </div>
+      </div>
+    );
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

@@ -101,6 +101,7 @@ export default function ProjectsPage() {
       });
     } catch {
       setError("Не удалось создать проект");
+      setTimeout(() => setError(""), 4000);
     } finally {
       setCreating(false);
     }
@@ -206,7 +207,7 @@ const filteredProjects = projects.filter((p) =>
         <div className={styles.errorBanner}>{error}</div>
       )}
 
-      {projects.length > 3 && (
+      {projects.length > 0 && (
         <div className={styles.searchRow}>
           <input
             type="text"

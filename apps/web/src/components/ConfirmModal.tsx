@@ -9,6 +9,7 @@ type Props = {
   onConfirm: () => void;
   onCancel: () => void;
   danger?: boolean;
+  error?: string;
 };
 
 export default function ConfirmModal({
@@ -18,12 +19,14 @@ export default function ConfirmModal({
   onConfirm,
   onCancel,
   danger = false,
+  error,
 }: Props) {
   return (
     <div className={styles.overlay} onClick={onCancel}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <h2 className={styles.title}>{title}</h2>
         <p className={styles.message}>{message}</p>
+        {error && <p className={styles.error}>{error}</p>}
         <div className={styles.buttons}>
           <button className={styles.cancel} onClick={onCancel}>
             Отмена

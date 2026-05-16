@@ -98,9 +98,12 @@ export default function DashboardPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameName, setRenameName] = useState("");
   const [renaming, setRenaming] = useState(false);
+  const [renameError, setRenameError] = useState("");
+  const [countsError, setCountsError] = useState("");
   const trackedOpenProjectId = useRef<string | null>(null);
 
   useEffect(() => {
@@ -129,12 +132,6 @@ export default function DashboardPage() {
         setLoadError("Не удалось загрузить данные проекта.");
       });
   }, [projectId, router]);
-
-  useEffect(() => {
-    if (project) {
-      document.title = `MCollector — ${project.name}`;
-    }
-  }, [project]);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -200,8 +197,12 @@ export default function DashboardPage() {
 
       try {
         const data = await authFetch(url, router).then((r) => r.json());
-        if (!cancelled) setEventCounts(data);
+        if (!cancelled) {
+          setEventCounts(data);
+          setCountsError("");
+        }
       } catch {
+        if (!cancelled) setCountsError("Не удалось загрузить статистику событий.");
       }
     }
 
@@ -234,6 +235,7 @@ export default function DashboardPage() {
   async function confirmRename() {
     if (!renameName.trim() || renaming) return;
     setRenaming(true);
+    setRenameError("");
     try {
       const res = await authFetch(`${BASE_URL}/api/projects/${projectId}`, router, {
         method: "PUT",
@@ -244,7 +246,8 @@ export default function DashboardPage() {
       setProject(updated);
       document.title = `MCollector — ${updated.name}`;
       setRenameOpen(false);
-    } catch {
+    } catch (err) {
+      setRenameError(err instanceof Error ? err.message : "Не удалось переименовать проект");
     } finally {
       setRenaming(false);
     }
@@ -252,12 +255,14 @@ export default function DashboardPage() {
 
   async function confirmDelete() {
     setDeleting(true);
+    setDeleteError("");
     try {
       await authFetch(`${BASE_URL}/api/projects/${projectId}`, router, {
         method: "DELETE",
       });
       router.push("/projects");
-    } catch {
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Не удалось удалить проект");
     } finally {
       setDeleting(false);
     }
@@ -357,8 +362,9 @@ export default function DashboardPage() {
           <button
             className={styles.buttonOutline}
             onClick={() => setRefreshKey((k) => k + 1)}
+            disabled={loading}
           >
-            ↻ Обновить
+            {loading ? "Обновление..." : "↻ Обновить"}
           </button>
 
           <button
@@ -408,7 +414,11 @@ export default function DashboardPage() {
           <div className={styles.countsControls}>
             {eventCountsPeriod !== "total" && (
               <div className={styles.periodNav}>
-                <button className={styles.periodNavBtn} onClick={() => setPeriodOffset((o) => o + 1)}>←</button>
+                <button
+                  className={styles.periodNavBtn}
+                  onClick={() => setPeriodOffset((o) => o + 1)}
+                  disabled={periodOffset >= (eventCountsPeriod === "day" ? 364 : eventCountsPeriod === "week" ? 51 : 11)}
+                >←</button>
                 <span className={styles.periodNavLabel}>{formatPeriodLabel(eventCountsPeriod, periodOffset)}</span>
                 <button className={styles.periodNavBtn} onClick={() => setPeriodOffset((o) => o - 1)} disabled={periodOffset === 0}>→</button>
               </div>
@@ -426,7 +436,9 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
-        {eventCounts.length === 0 ? (
+        {countsError ? (
+          <p className={styles.chartEmpty}>{countsError}</p>
+        ) : eventCounts.length === 0 ? (
           <p className={styles.chartEmpty}>Нет данных</p>
         ) : (
           <table className={styles.table}>
@@ -498,12 +510,13 @@ export default function DashboardPage() {
             <input
               type="text"
               value={renameName}
-              onChange={(e) => setRenameName(e.target.value)}
+              onChange={(e) => { setRenameName(e.target.value); setRenameError(""); }}
               onKeyDown={(e) => e.key === "Enter" && confirmRename()}
               className={styles.input}
               autoFocus
-              style={{ marginBottom: 20 }}
+              style={{ marginBottom: renameError ? 8 : 20 }}
             />
+            {renameError && <p style={{ fontSize: 13, color: "#dc2626", marginBottom: 12 }}>{renameError}</p>}
             <div className={styles.modalButtons}>
               <button className={styles.button} onClick={confirmRename} disabled={renaming || !renameName.trim()}>
                 {renaming ? "Сохранение..." : "Сохранить"}
@@ -522,8 +535,9 @@ export default function DashboardPage() {
           message={`Проект "${project?.name}" и все его данные будут удалены. Это действие необратимо.`}
           confirmLabel={deleting ? "Удаление..." : "Удалить"}
           danger
+          error={deleteError}
           onConfirm={confirmDelete}
-          onCancel={() => setDeleteConfirm(false)}
+          onCancel={() => { setDeleteConfirm(false); setDeleteError(""); }}
         />
       )}
     </div>

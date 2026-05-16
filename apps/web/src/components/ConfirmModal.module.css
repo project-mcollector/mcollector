@@ -31,6 +31,12 @@
   line-height: 1.5;
 }
 
+.error {
+  font-size: 13px;
+  color: #dc2626;
+  margin: -12px 0 16px 0;
+}
+
 .buttons {
   display: flex;
   gap: 10px;

@@ -17,6 +17,13 @@ function ResetPasswordContent() {
   const userId = searchParams.get("userId");
   const token = searchParams.get("token");
 
+  const passwordRequirements = [
+    { check: password.length >= 8, label: "Не менее 8 символов" },
+    { check: /[a-z]/.test(password), label: "Строчная буква (a-z)" },
+    { check: /[A-Z]/.test(password), label: "Заглавная буква (A-Z)" },
+    { check: /[^a-zA-Z0-9]/.test(password), label: "Специальный символ (!@#$)" },
+  ];
+
   useEffect(() => {
     document.title = "MCollector — Новый пароль";
   }, []);
@@ -99,6 +106,16 @@ function ResetPasswordContent() {
                     )}
                   </button>
                 </div>
+                {password && (
+                  <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+                    {passwordRequirements.map(({ check, label }) => (
+                      <div key={label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: check ? "#16a34a" : "#a1a1aa" }}>
+                        <span style={{ fontSize: 14 }}>{check ? "✓" : "○"}</span>
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <button type="submit" disabled={loading} className={styles.button}>

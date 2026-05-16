@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "../login.module.css";
 import { BASE_URL } from "@/lib/constants";
+import { isTokenFresh } from "@/lib/auth";
 import IntegrationCard from "../IntegrationCard";
 
 export default function RegisterPage() {
@@ -24,14 +25,24 @@ export default function RegisterPage() {
 
   useEffect(() => {
     document.title = "MCollector — Регистрация";
-    if (localStorage.getItem("token")) {
+    const token = localStorage.getItem("token");
+    if (token && isTokenFresh(token)) {
       router.replace("/projects");
     } else {
       setReady(true);
     }
   }, [router]);
 
-  if (!ready) return null;
+  if (!ready) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.card}>
+          <h1 className={styles.title}>MCollector</h1>
+          <p className={styles.subtitle}>Загрузка...</p>
+        </div>
+      </div>
+    );
+  }
 
   function validatePassword(pwd: string): string[] {
     const errors = [];

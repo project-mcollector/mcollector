@@ -168,7 +168,19 @@ function ConfirmEmailContent() {
     );
   }
 
-  if (!createdProject) return null;
+  if (!createdProject) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.card}>
+          <h1 className={styles.title}>MCollector</h1>
+          <p className={styles.subtitle}>Email подтверждён!</p>
+          <p className={styles.linkText}>
+            <Link href="/projects" className={styles.link}>Перейти к проектам</Link>
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.page}>

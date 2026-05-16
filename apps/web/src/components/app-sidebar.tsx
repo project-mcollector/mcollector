@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { FolderOpen, Settings, LogOut, Trash2, ChevronsUpDown, GalleryVerticalEnd } from "lucide-react";
+import { FolderOpen, GalleryVerticalEnd, Settings } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -16,15 +16,8 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { authFetch, logout } from "@/lib/auth";
+import { NavUser } from "@/components/nav-user";
+import { authFetch } from "@/lib/auth";
 import { BASE_URL } from "@/lib/constants";
 import ConfirmModal from "@/components/ConfirmModal";
 
@@ -38,15 +31,6 @@ const navItems = [
   { title: "Projects", url: "/projects", icon: FolderOpen },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
-
-function UserAvatar({ email }: { email: string | null }) {
-  const initial = email?.[0]?.toUpperCase() ?? "?";
-  return (
-    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-zinc-900 text-xs font-semibold text-white">
-      {initial}
-    </div>
-  );
-}
 
 export function AppSidebar() {
   const router = useRouter();
@@ -75,20 +59,25 @@ export function AppSidebar() {
     }
   }
 
-  const displayName = user?.userName ?? user?.email ?? "…";
-
   return (
     <>
       <Sidebar collapsible="icon">
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton size="lg" asChild>
+              <SidebarMenuButton
+                size="lg"
+                className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                asChild
+              >
                 <Link href="/projects">
-                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-zinc-900 text-white">
+                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                     <GalleryVerticalEnd className="size-4" />
                   </div>
-                  <span className="truncate font-semibold">MCollector</span>
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-semibold">MCollector</span>
+                    <span className="truncate text-xs text-muted-foreground">Analytics</span>
+                  </div>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -101,7 +90,11 @@ export function AppSidebar() {
               <SidebarMenu>
                 {navItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={pathname.startsWith(item.url)}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={pathname.startsWith(item.url)}
+                      tooltip={item.title}
+                    >
                       <Link href={item.url}>
                         <item.icon />
                         <span>{item.title}</span>
@@ -115,59 +108,10 @@ export function AppSidebar() {
         </SidebarContent>
 
         <SidebarFooter>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <SidebarMenuButton size="lg">
-                    <UserAvatar email={user?.email ?? null} />
-                    <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-semibold">{displayName}</span>
-                      {user?.userName && user.email && (
-                        <span className="truncate text-xs text-muted-foreground">
-                          {user.email}
-                        </span>
-                      )}
-                    </div>
-                    <ChevronsUpDown className="ml-auto size-4" />
-                  </SidebarMenuButton>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
-                  side="top"
-                  align="end"
-                  sideOffset={4}
-                >
-                  <DropdownMenuLabel className="p-0 font-normal">
-                    <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                      <UserAvatar email={user?.email ?? null} />
-                      <div className="grid flex-1 text-left text-sm leading-tight">
-                        <span className="truncate font-semibold">{displayName}</span>
-                        {user?.email && (
-                          <span className="truncate text-xs text-muted-foreground">
-                            {user.email}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => logout(router)}>
-                    <LogOut className="size-4" />
-                    Log out
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onClick={() => setDeleteConfirm(true)}
-                  >
-                    <Trash2 className="size-4" />
-                    Delete account
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </SidebarMenuItem>
-          </SidebarMenu>
+          <NavUser
+            user={user ? { name: user.userName ?? "", email: user.email ?? "" } : null}
+            onDeleteAccount={() => setDeleteConfirm(true)}
+          />
         </SidebarFooter>
         <SidebarRail />
       </Sidebar>

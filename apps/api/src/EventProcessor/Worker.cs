@@ -19,7 +19,7 @@ public class Worker(
                 BootstrapServers = configuration["Kafka:BootstrapServers"] ?? "localhost:9092",
                 GroupId = configuration["Kafka:GroupId"] ?? "event-processor-group",
                 AutoOffsetReset = AutoOffsetReset.Earliest,
-                EnableAutoCommit = false // We will commit manually after processing
+                EnableAutoCommit = false // Commit manually after processing
             };
             using var consumer = new ConsumerBuilder<Ignore, string>(consumerConfig).Build();
 
@@ -32,33 +32,34 @@ public class Worker(
                 {
                     var consumeResult = consumer.Consume(stoppingToken);
 
-                    if (consumeResult?.Message != null)
+                    if (consumeResult?.Message == null) continue;
+
+                    try
                     {
-                        try
+                        if (logger.IsEnabled(LogLevel.Debug))
+                            logger.LogDebug("Received message: {Message}", consumeResult.Message.Value);
+
+                        var rawEvent = JsonSerializer.Deserialize<RawEvent>(consumeResult.Message.Value,
+                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                        if (rawEvent != null)
                         {
-                            logger.LogInformation("Received message: {Message}", consumeResult.Message.Value);
+                            using var scope = serviceProvider.CreateScope();
+                            var processor = scope.ServiceProvider.GetRequiredService<IEventConsumer<RawEvent>>();
 
-                            var rawEvent = JsonSerializer.Deserialize<RawEvent>(consumeResult.Message.Value, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-                            if (rawEvent != null)
-                            {
-                                using var scope = serviceProvider.CreateScope();
-                                var processor = scope.ServiceProvider.GetRequiredService<IEventConsumer<RawEvent>>();
-
-                                await processor.ConsumeAsync(rawEvent, stoppingToken);
-                            }
-
-                            consumer.Commit(consumeResult);
+                            await processor.ConsumeAsync(rawEvent, stoppingToken);
                         }
-                        catch (Exception ex)
-                        {
-                            logger.LogError(ex, "Error processing message — NOT committing offset, message will be re-processed");
-                        }
+
+                        consumer.Commit(consumeResult);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex,
+                            "Error processing message — NOT committing offset, message will be re-processed");
                     }
                 }
                 catch (OperationCanceledException)
                 {
-                    // Graceful shutdown
                     break;
                 }
                 catch (Exception ex)

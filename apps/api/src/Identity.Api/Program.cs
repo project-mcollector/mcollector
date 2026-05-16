@@ -1,3 +1,4 @@
+using Identity.Api.Application.Options;
 using Identity.Api.Application.Services;
 using Identity.Api.Domain.Entities;
 using Identity.Api.Infrastructure.HealthChecks;
@@ -31,11 +32,22 @@ builder.Services.AddAuthorizationBuilder()
 
 builder.Services.AddSharedAuthentication(builder.Configuration);
 
+builder.Services.AddAuthentication()
+    .AddCookie(IdentityConstants.ApplicationScheme, options =>
+    {
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Strict;
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(5);
+    })
+    .AddCookie(IdentityConstants.ExternalScheme)
+    .AddCookie(IdentityConstants.TwoFactorRememberMeScheme)
+    .AddCookie(IdentityConstants.TwoFactorUserIdScheme);
+
 builder.Services.AddDbContext<IdentityAppDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
                            ?? throw new InvalidOperationException(
-                               "Connection string 'DefaultConnection' is not configured");
+                               "DefaultConnection is not configured");
 
     options.UseNpgsql(connectionString);
 });
@@ -46,17 +58,47 @@ builder.Services.AddIdentityCore<ApplicationUser>(options =>
         options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
         options.Lockout.AllowedForNewUsers = true;
         options.SignIn.RequireConfirmedEmail = true;
+        options.Stores.SchemaVersion =
+            IdentitySchemaVersions.Version3;
     })
     .AddEntityFrameworkStores<IdentityAppDbContext>()
-    .AddDefaultTokenProviders();
+    .AddDefaultTokenProviders()
+    .AddSignInManager();
+
+builder.Services.Configure<IdentityPasskeyOptions>(options =>
+{
+    options.ServerDomain = builder.Configuration["Passkey:ServerDomain"]
+                           ?? throw new InvalidOperationException("Passkey:ServerDomain is not configured");
+    options.AuthenticatorTimeout =
+        TimeSpan.FromMinutes(
+            TryParseWithDefault(builder.Configuration["Passkey:AuthenticatorTimeoutMinutes"],
+                3));
+    options.ChallengeSize = TryParseWithDefault(
+        builder.Configuration["Passkey:ChallengeSize"],
+        64);
+    options.UserVerificationRequirement = builder.Configuration["Passkey:UserVerificationRequirement"]
+                                          ?? "required";
+});
 
 builder.Services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
+builder.Services.AddScoped<IMailService, MailService>();
 builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IPasskeyService, PasskeyService>();
 builder.Services.AddScoped<IProjectsService, ProjectsService>();
 builder.Services.AddScoped<IUsersService, UsersService>();
 
-builder.Services.AddOptions();
+builder.Services.AddOptions<JwtOptions>()
+    .BindConfiguration(JwtOptions.Section)
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+builder.Services.AddOptions<MailOptions>()
+    .Bind(builder.Configuration)
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
 builder.Services.AddHttpClient<ResendClient>();
 builder.Services.Configure<ResendClientOptions>(o =>
 {
@@ -141,11 +183,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(options => { options.SwaggerEndpoint("/openapi/v1.json", "IdentityApi v1"); });
 }
 
+app.UseForwardedHeaders();
+
 app.UseHttpsRedirection();
 
 app.UseCors();
-
-app.UseForwardedHeaders();
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -153,7 +195,7 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapHealthChecks("/health");
-app.MapHealthChecks("/health/live");
+app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
 app.MapHealthChecks("/health/ready", new()
 {
     Predicate = check => check.Tags.Contains("ready"),
@@ -179,3 +221,8 @@ static Task WriteHealthResponse(HttpContext context, HealthReport report)
     }, JsonSerializerOptions.Web);
     return context.Response.WriteAsync(result);
 }
+
+static int TryParseWithDefault(string? value, int defaultValue)
+    => int.TryParse(value, out var result)
+        ? result
+        : defaultValue;

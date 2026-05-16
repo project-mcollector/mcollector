@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-
 namespace Identity.Api.Application.Services;
 
 public interface IApiKeyService

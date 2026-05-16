@@ -100,6 +100,7 @@ services:
     environment:
       - ConnectionStrings__DefaultConnection=${DB_CONNECTION_STRING:?DB_CONNECTION_STRING must be set}
       - Jwt__Secret=${JWT_SECRET:?JWT_SECRET must be set}
+      - Passkey__ServerDomain=${PASSKEY_SERVER_DOMAIN:?PASSKEY_SERVER_DOMAIN must be set}
       - AllowedOrigins=${ALLOWED_ORIGIN:-http://localhost:3000}
       - RESEND_APITOKEN=${RESEND_APITOKEN:?RESEND_APITOKEN must be set}
       - FrontendUrl=${FRONTEND_URL:?FRONTEND_URL must be set}

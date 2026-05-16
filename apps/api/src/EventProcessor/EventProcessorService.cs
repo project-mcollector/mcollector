@@ -9,29 +9,20 @@ using EventProcessor.Contracts;
 
 namespace EventProcessor;
 
-public class EventProcessorService : IEventConsumer<RawEvent>
+public class EventProcessorService(ILogger<EventProcessorService> logger, IProcessedEventRepository repository)
+    : IEventConsumer<RawEvent>
 {
-    private readonly ILogger<EventProcessorService> logger;
-    private readonly IProcessedEventRepository repository;
-
-    public EventProcessorService(
-        ILogger<EventProcessorService> logger
-        , IProcessedEventRepository repository)
-    {
-        this.logger = logger;
-        this.repository = repository;
-    }
-
     public async Task ConsumeAsync(RawEvent message, CancellationToken cancellationToken = default)
     {
         var validatorContext = new ValidationContext(message);
         var validationList = new List<ValidationResult>();
         if (!Validator.TryValidateObject(message, validatorContext, validationList, true))
         {
-            logger.LogWarning(
-                "Dropping invalid event {EventId} for project {ProjectId}. Errors: {Errors}",
-                message.EventId, message.ProjectId,
-                string.Join(", ", validationList.Select(x => x.ErrorMessage)));
+            if (logger.IsEnabled(LogLevel.Warning))
+                logger.LogWarning(
+                    "Dropping invalid event {EventId} for project {ProjectId}. Errors: {Errors}",
+                    message.EventId, message.ProjectId,
+                    string.Join(", ", validationList.Select(x => x.ErrorMessage)));
             return;
         }
 
@@ -56,9 +47,12 @@ public class EventProcessorService : IEventConsumer<RawEvent>
         }
         catch (DbUpdateException ex) when (IsUniqueViolation(ex))
         {
-            logger.LogWarning("Duplicate event {EventId} for project {ProjectId} — skipping", message.EventId, message.ProjectId);
+            if (logger.IsEnabled(LogLevel.Warning))
+                logger.LogWarning("Duplicate event {EventId} for project {ProjectId} — skipping", message.EventId,
+                    message.ProjectId);
             return;
         }
+
         sw.Stop();
 
         logger.LogInformation(
@@ -66,11 +60,9 @@ public class EventProcessorService : IEventConsumer<RawEvent>
             message.EventId, message.EventName, message.ProjectId, sw.ElapsedMilliseconds);
     }
 
-    private static bool IsUniqueViolation(DbUpdateException ex)
-    {
-        return ex.InnerException is DbException dbEx
-            && (dbEx.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase)
-                || dbEx.Message.Contains("unique", StringComparison.OrdinalIgnoreCase)
-                || dbEx.Message.Contains("23505"));
-    }
+    private static bool IsUniqueViolation(DbUpdateException ex) =>
+        ex.InnerException is DbException dbEx
+        && (dbEx.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase)
+            || dbEx.Message.Contains("unique", StringComparison.OrdinalIgnoreCase)
+            || dbEx.Message.Contains("23505"));
 }

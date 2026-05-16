@@ -7,11 +7,12 @@ on:
     branches: [main]
 
 jobs:
-  lint:
+  # ── Checks (all run in parallel) ────────────────────────────────────────────
+
+  lint-api:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
@@ -23,51 +24,28 @@ jobs:
       - name: API format check
         run: dotnet format apps/api/Api.sln --verify-no-changes
 
+  check-js:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Frontend lint
-        run: pnpm --filter web lint
+      - name: Build, lint, typecheck, test
+        env:
+          RESEND_APITOKEN: ${{ secrets.RESEND_APITOKEN }}
+          RESEND_WEBHOOK_SECRET: ${{ secrets.RESEND_WEBHOOK_SECRET }}
+          RESEND_FORWARD_TO: ${{ secrets.RESEND_FORWARD_TO }}
+          RESEND_FORWARD_FROM: ${{ secrets.RESEND_FORWARD_FROM }}
+        run: pnpm turbo run build lint typecheck test
 
-  build:
-    needs: lint
+  test-api:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "10.0.x"
-      - uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ hashFiles('apps/api/**/*.csproj') }}
-          restore-keys: nuget-
-      - name: Build API
-        run: |
-          dotnet restore apps/api/Api.sln
-          dotnet build apps/api/Api.sln --no-restore
-
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Build SDK
-        run: pnpm --filter @mcollector/sdk build
-      - name: Build frontend
-        run: pnpm --filter web build
-
-  test:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
@@ -79,35 +57,23 @@ jobs:
       - name: API tests
         run: dotnet test apps/api/Api.sln
 
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: SDK tests
-        run: pnpm --filter @mcollector/sdk test
+  # ── Publish SDK (main only) ──────────────────────────────────────────────────
 
   publish-sdk:
-    needs: test
+    needs: [lint-api, check-js, test-api]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org
           cache: pnpm
-
       - run: pnpm install --frozen-lockfile
-
       - name: Build SDK
-        run: pnpm --filter @mcollector/sdk build
-
+        run: pnpm turbo run build --filter @mcollector/sdk
       - name: Check if version already published
         id: version_check
         run: |
@@ -120,52 +86,61 @@ jobs:
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
       - name: Publish SDK
         if: steps.version_check.outputs.skip == 'false'
         run: pnpm --filter @mcollector/sdk publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-  build-and-push:
-    needs: test
+  # ── Docker builds (main only, API services run in parallel via matrix) ───────
+
+  build-and-push-api:
+    needs: [lint-api, check-js, test-api]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - { name: ingestion, dockerfile: apps/api/src/Ingestion.Api/Dockerfile }
+          - { name: analytics, dockerfile: apps/api/src/Analytics.Api/Dockerfile }
+          - { name: identity,  dockerfile: apps/api/src/Identity.Api/Dockerfile }
+          - { name: processor, dockerfile: apps/api/src/EventProcessor/Dockerfile }
     env:
       REGISTRY: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/mcollector
     steps:
       - uses: actions/checkout@v4
-
       - uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
       - uses: google-github-actions/setup-gcloud@v2
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev --quiet
-
-      - name: Build and push API images
+      - name: Build and push ${{ matrix.service.name }}
         run: |
           TAG=${{ github.sha }}
-          R=${{ env.REGISTRY }}
+          docker build \
+            -t "${{ env.REGISTRY }}/${{ matrix.service.name }}:$TAG" \
+            -t "${{ env.REGISTRY }}/${{ matrix.service.name }}:latest" \
+            -f "${{ matrix.service.dockerfile }}" \
+            apps/api
+          docker push "${{ env.REGISTRY }}/${{ matrix.service.name }}:$TAG"
+          docker push "${{ env.REGISTRY }}/${{ matrix.service.name }}:latest"
 
-          declare -A services=(
-            [ingestion]="apps/api/src/Ingestion.Api/Dockerfile"
-            [analytics]="apps/api/src/Analytics.Api/Dockerfile"
-            [identity]="apps/api/src/Identity.Api/Dockerfile"
-            [processor]="apps/api/src/EventProcessor/Dockerfile"
-          )
-
-          for name in "${!services[@]}"; do
-            docker build \
-              -t "$R/$name:$TAG" \
-              -t "$R/$name:latest" \
-              -f "${services[$name]}" \
-              apps/api
-            docker push "$R/$name:$TAG"
-            docker push "$R/$name:latest"
-          done
-
-      - name: Build and push web image
+  build-and-push-web:
+    needs: [lint-api, check-js, test-api]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/mcollector
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev --quiet
+      - name: Build and push web
         run: |
           TAG=${{ github.sha }}
           docker build \
@@ -180,14 +155,15 @@ jobs:
           docker push "${{ env.REGISTRY }}/web:$TAG"
           docker push "${{ env.REGISTRY }}/web:latest"
 
+  # ── Deploy ───────────────────────────────────────────────────────────────────
+
   deploy:
-    needs: build-and-push
+    needs: [build-and-push-api, build-and-push-web]
     runs-on: ubuntu-latest
     env:
       REGISTRY: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/mcollector
     steps:
       - uses: actions/checkout@v4
-
       - uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
@@ -210,6 +186,7 @@ jobs:
       - name: Deploy
         env:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          PASSKEY_SERVER_DOMAIN: ${{ secrets.PASSKEY_SERVER_DOMAIN }}
           ALLOWED_ORIGIN: ${{ secrets.ALLOWED_ORIGIN }}
           DB_CONNECTION_STRING: ${{ secrets.DB_CONNECTION_STRING }}
           RESEND_APITOKEN: ${{ secrets.RESEND_APITOKEN }}
@@ -222,6 +199,7 @@ jobs:
             echo "REGISTRY=${{ env.REGISTRY }}"
             echo "IMAGE_TAG=${{ github.sha }}"
             echo "JWT_SECRET=${JWT_SECRET}"
+            echo "PASSKEY_SERVER_DOMAIN=${PASSKEY_SERVER_DOMAIN}"
             echo "ALLOWED_ORIGIN=${ALLOWED_ORIGIN}"
             echo "DB_CONNECTION_STRING=${DB_CONNECTION_STRING}"
             echo "RESEND_APITOKEN=${RESEND_APITOKEN}"

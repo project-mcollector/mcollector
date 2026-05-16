@@ -1,9 +1,15 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Utilities;
 
 public class Result
 {
+    [MemberNotNullWhen(false, nameof(Error))]
     public bool IsSuccess { get; }
+
+    [MemberNotNullWhen(true, nameof(Error))]
     public bool IsFailure => !IsSuccess;
+
     public Error? Error { get; }
 
     protected Result(bool isSuccess, Error? error)
@@ -40,8 +46,18 @@ public class Result<T> : Result
         get => IsSuccess
             ? field
             : throw new InvalidOperationException("Cannot access value of a failed result");
-        set;
+        init;
     }
+
+    public new Error? Error => base.Error;
+
+    [MemberNotNullWhen(true, nameof(Value))]
+    [MemberNotNullWhen(false, nameof(Error))]
+    public new bool IsSuccess => base.IsSuccess;
+
+    [MemberNotNullWhen(true, nameof(Error))]
+    [MemberNotNullWhen(false, nameof(Value))]
+    public new bool IsFailure => !IsSuccess;
 
     internal Result(T value) : base(true, null)
         => Value = value;

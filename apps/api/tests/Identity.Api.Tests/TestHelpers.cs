@@ -14,4 +14,9 @@ internal static class TestHelpers
                 [new Claim(ClaimTypes.NameIdentifier, userId)], "TestAuth"))
         }
     };
+
+    internal static ControllerContext AnonymousControllerContext() => new()
+    {
+        HttpContext = new DefaultHttpContext { User = new() }
+    };
 }

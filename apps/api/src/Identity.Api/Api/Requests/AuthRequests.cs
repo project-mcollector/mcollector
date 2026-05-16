@@ -5,8 +5,7 @@ namespace Identity.Api.Api.Requests;
 public class LoginRequest
 {
     [Required]
-    [EmailAddress]
-    [MaxLength(256)]
+    [ValidEmail]
     public required string Email { get; init; }
 
     [Required]
@@ -18,16 +17,13 @@ public class LoginRequest
 public class RegisterRequest
 {
     [Required]
-    [EmailAddress]
-    [MaxLength(256)]
+    [ValidEmail]
     public required string Email { get; init; }
 
     [Required]
     [MinLength(8)]
     [MaxLength(128)]
     public required string Password { get; init; }
-
-    [MaxLength(100)] public string? OrganizationName { get; init; }
 }
 
 public class RefreshRequest
@@ -43,16 +39,14 @@ public class RevokeRequest
 public class ResendConfirmationRequest
 {
     [Required]
-    [EmailAddress]
-    [MaxLength(256)]
+    [ValidEmail]
     public required string Email { get; init; }
 }
 
 public class ForgotPasswordRequest
 {
     [Required]
-    [EmailAddress]
-    [MaxLength(256)]
+    [ValidEmail]
     public required string Email { get; init; }
 }
 
@@ -65,4 +59,15 @@ public class ResetPasswordRequest
     [MinLength(8)]
     [MaxLength(128)]
     public required string Password { get; init; }
+}
+
+public class PasskeyOptionsRequest
+{
+    [ValidEmail]
+    public string? Email { get; init; }
+}
+
+public class PasskeyCredentialRequest
+{
+    [Required] public required string CredentialJson { get; init; }
 }

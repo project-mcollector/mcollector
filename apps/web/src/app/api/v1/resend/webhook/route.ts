@@ -3,8 +3,6 @@ import { Resend } from "resend";
 
 export const runtime = "nodejs";
 
-const resend = new Resend(process.env.RESEND_APITOKEN);
-
 export async function POST(request: NextRequest) {
   const payload = await request.text();
 
@@ -18,6 +16,13 @@ export async function POST(request: NextRequest) {
   if (!webhookSecret) {
     return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 });
   }
+
+  const resendApiToken = process.env.RESEND_APITOKEN;
+  if (!resendApiToken) {
+    return NextResponse.json({ error: "Resend API key not configured" }, { status: 500 });
+  }
+
+  const resend = new Resend(resendApiToken);
 
   try {
     resend.webhooks.verify({ webhookSecret, payload, headers });

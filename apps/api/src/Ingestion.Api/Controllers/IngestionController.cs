@@ -50,6 +50,14 @@ public class IngestionController(
         if (requests.Count > 50)
             return BadRequest(new { error = "Batch size cannot exceed 50 events" });
 
+        for (var i = 0; i < requests.Count; i++)
+        {
+            if (string.IsNullOrWhiteSpace(requests[i].EventName))
+                return BadRequest(new { error = $"Event at index {i}: eventName is required" });
+            if (string.IsNullOrWhiteSpace(requests[i].UserId) && string.IsNullOrWhiteSpace(requests[i].AnonymousId))
+                return BadRequest(new { error = $"Event at index {i}: userId or anonymousId is required" });
+        }
+
         var rawEvents = requests.Select(r => BuildRawEvent(projectId, r.EventName,
             r.UserId, r.AnonymousId, r.SessionId, r.Properties, r.ClientTimestamp));
 
@@ -65,6 +73,9 @@ public class IngestionController(
     {
         if (string.IsNullOrWhiteSpace(request.WriteKey))
             return BadRequest(new { error = "writeKey is required" });
+
+        if (request.Events.Count == 0)
+            return BadRequest(new { error = "Request body must contain a non-empty array of events" });
 
         if (request.Events.Count > 50)
             return BadRequest(new { error = "Batch size cannot exceed 50 events" });
@@ -104,12 +115,12 @@ public class IngestionController(
         if (context.Referrer is not null) merged["$referrer"] = context.Referrer;
         if (context.Screen is not null)
             merged["$screen"] = new { width = context.Screen.Width, height = context.Screen.Height };
-        if (context.Utm is not null)
-        {
-            if (context.Utm.Source is not null) merged["$utm_source"] = context.Utm.Source;
-            if (context.Utm.Medium is not null) merged["$utm_medium"] = context.Utm.Medium;
-            if (context.Utm.Campaign is not null) merged["$utm_campaign"] = context.Utm.Campaign;
-        }
+
+        if (context.Utm is null) return merged;
+
+        if (context.Utm.Source is not null) merged["$utm_source"] = context.Utm.Source;
+        if (context.Utm.Medium is not null) merged["$utm_medium"] = context.Utm.Medium;
+        if (context.Utm.Campaign is not null) merged["$utm_campaign"] = context.Utm.Campaign;
 
         return merged;
     }

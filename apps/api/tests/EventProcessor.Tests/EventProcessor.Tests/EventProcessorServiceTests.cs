@@ -1,13 +1,21 @@
-using System.ComponentModel.DataAnnotations;
+using System.Data.Common;
+using System.Text.Json;
 using Contracts.Messages;
 using EventProcessor;
 using EventProcessor.Contracts;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 
 namespace EventProcessor.Tests;
+
+/// <summary>
+/// Minimal DbException subclass so we can satisfy the abstract-class constraint when
+/// simulating unique-violation errors from the database layer.
+/// </summary>
+file sealed class FakeDbException(string message) : DbException(message);
 
 public class EventProcessorServiceTests
 {
@@ -22,63 +30,224 @@ public class EventProcessorServiceTests
         _service = new EventProcessorService(_loggerMock.Object, _repositoryMock.Object);
     }
 
+    // -------------------------------------------------------------------------
+    // Validation: invalid events are dropped without touching the repository
+    // -------------------------------------------------------------------------
+
     [Fact]
-    public async Task ConsumeAsync_InvalidEvent_ShouldNotSaveAndLogWarning()
+    public async Task ConsumeAsync_EventWithNullEventName_ShouldNotSave()
     {
-        // Arrange
+        // EventName is [Required] — a null value must be rejected by the validator.
         var invalidEvent = new RawEvent
         {
-            // Set required fields to valid types to avoid CS9035, but we can make it invalid via other means
             EventId = Guid.NewGuid(),
             ProjectId = Guid.NewGuid(),
-            EventName = null!, // Intentionally invalid for validation
-            UserId = null!     // Intentionally invalid for validation
+            EventName = null!,
+            UserId = "user-123"
         };
 
-        // Act
         await _service.ConsumeAsync(invalidEvent, CancellationToken.None);
 
-        // Assert
-        _repositoryMock.Verify(r => r.AddAsync(It.IsAny<ProcessedEvent>(), It.IsAny<CancellationToken>()), Times.Never);
+        _repositoryMock.Verify(r => r.AddAsync(It.IsAny<ProcessedEvent>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
-    public async Task ConsumeAsync_DuplicateEvent_ShouldNotSaveAndLogInformation()
+    public async Task ConsumeAsync_EventWithNullUserId_ShouldNotSave()
     {
-        // Arrange
-        var validEvent = CreateValidRawEvent();
-        _repositoryMock.Setup(r => r.ExistsByEventIdAsync(validEvent.EventId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true); // Simulate duplication
+        // UserId is [Required].
+        var invalidEvent = new RawEvent
+        {
+            EventId = Guid.NewGuid(),
+            ProjectId = Guid.NewGuid(),
+            EventName = "page_view",
+            UserId = null!
+        };
 
-        // Act
+        await _service.ConsumeAsync(invalidEvent, CancellationToken.None);
+
+        _repositoryMock.Verify(r => r.AddAsync(It.IsAny<ProcessedEvent>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    // -------------------------------------------------------------------------
+    // Happy path: valid event is persisted
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task ConsumeAsync_ValidEvent_ShouldCallAddAsync()
+    {
+        var validEvent = CreateValidRawEvent();
+
         await _service.ConsumeAsync(validEvent, CancellationToken.None);
 
-        // Assert
-        _repositoryMock.Verify(r => r.AddAsync(It.IsAny<ProcessedEvent>(), It.IsAny<CancellationToken>()), Times.Never);
+        _repositoryMock.Verify(r => r.AddAsync(
+            It.Is<ProcessedEvent>(pe =>
+                pe.EventId == validEvent.EventId &&
+                pe.EventName == validEvent.EventName &&
+                pe.ProjectId == validEvent.ProjectId &&
+                pe.UserId == validEvent.UserId),
+            It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    // -------------------------------------------------------------------------
+    // Timestamp selection: ClientTimestamp preferred when non-default
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task ConsumeAsync_WithClientTimestamp_ShouldUseClientTimestamp()
+    {
+        var clientTs = new DateTimeOffset(2025, 6, 1, 10, 0, 0, TimeSpan.Zero);
+        var serverTs = new DateTimeOffset(2025, 6, 1, 10, 0, 5, TimeSpan.Zero);
+
+        var rawEvent = CreateValidRawEvent() with
+        {
+            ClientTimestamp = clientTs,
+            ServerTimestamp = serverTs
+        };
+
+        ProcessedEvent? captured = null;
+        _repositoryMock
+            .Setup(r => r.AddAsync(It.IsAny<ProcessedEvent>(), It.IsAny<CancellationToken>()))
+            .Callback<ProcessedEvent, CancellationToken>((e, _) => captured = e)
+            .Returns(Task.CompletedTask);
+
+        await _service.ConsumeAsync(rawEvent, CancellationToken.None);
+
+        captured.Should().NotBeNull();
+        captured!.Timestamp.Should().Be(clientTs);
     }
 
     [Fact]
-    public async Task ConsumeAsync_ValidAndNewEvent_ShouldSaveToRepository()
+    public async Task ConsumeAsync_WithDefaultClientTimestamp_ShouldUseServerTimestamp()
     {
-        // Arrange
-        var validEvent = CreateValidRawEvent();
-        _repositoryMock.Setup(r => r.ExistsByEventIdAsync(validEvent.EventId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(false);
+        var serverTs = new DateTimeOffset(2025, 6, 1, 10, 0, 5, TimeSpan.Zero);
 
-        // Act
-        await _service.ConsumeAsync(validEvent, CancellationToken.None);
+        // ClientTimestamp left at default(DateTimeOffset) = DateTimeOffset.MinValue
+        var rawEvent = CreateValidRawEvent() with
+        {
+            ClientTimestamp = default,
+            ServerTimestamp = serverTs
+        };
 
-        // Assert
-        _repositoryMock.Verify(r => r.AddAsync(It.Is<ProcessedEvent>(pe =>
-            pe.EventId == validEvent.EventId &&
-            pe.EventName == validEvent.EventName &&
-            pe.UserId == validEvent.UserId
-        ), It.IsAny<CancellationToken>()), Times.Once);
+        ProcessedEvent? captured = null;
+        _repositoryMock
+            .Setup(r => r.AddAsync(It.IsAny<ProcessedEvent>(), It.IsAny<CancellationToken>()))
+            .Callback<ProcessedEvent, CancellationToken>((e, _) => captured = e)
+            .Returns(Task.CompletedTask);
+
+        await _service.ConsumeAsync(rawEvent, CancellationToken.None);
+
+        captured.Should().NotBeNull();
+        captured!.Timestamp.Should().Be(serverTs);
     }
 
-    private RawEvent CreateValidRawEvent()
+    // -------------------------------------------------------------------------
+    // Properties serialization
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task ConsumeAsync_WithNullProperties_ShouldStoreNullPropertiesJson()
     {
-        return new RawEvent
+        var rawEvent = CreateValidRawEvent() with { Properties = null };
+
+        ProcessedEvent? captured = null;
+        _repositoryMock
+            .Setup(r => r.AddAsync(It.IsAny<ProcessedEvent>(), It.IsAny<CancellationToken>()))
+            .Callback<ProcessedEvent, CancellationToken>((e, _) => captured = e)
+            .Returns(Task.CompletedTask);
+
+        await _service.ConsumeAsync(rawEvent, CancellationToken.None);
+
+        captured.Should().NotBeNull();
+        captured!.PropertiesJson.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ConsumeAsync_WithProperties_ShouldSerializePropertiesJson()
+    {
+        var props = new Dictionary<string, object> { ["key"] = "value", ["count"] = 42 };
+        var rawEvent = CreateValidRawEvent() with { Properties = props };
+
+        ProcessedEvent? captured = null;
+        _repositoryMock
+            .Setup(r => r.AddAsync(It.IsAny<ProcessedEvent>(), It.IsAny<CancellationToken>()))
+            .Callback<ProcessedEvent, CancellationToken>((e, _) => captured = e)
+            .Returns(Task.CompletedTask);
+
+        await _service.ConsumeAsync(rawEvent, CancellationToken.None);
+
+        captured.Should().NotBeNull();
+        captured!.PropertiesJson.Should().NotBeNull();
+        // Round-trip to verify it's valid JSON representing the dictionary keys
+        var deserialized = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(captured.PropertiesJson!);
+        deserialized.Should().ContainKey("key");
+        deserialized.Should().ContainKey("count");
+    }
+
+    // -------------------------------------------------------------------------
+    // Duplicate detection: DbUpdateException with unique-violation inner exception
+    // is swallowed silently; the event is not re-thrown.
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task ConsumeAsync_DuplicateEvent_ShouldSwallowUniqueViolationException()
+    {
+        var validEvent = CreateValidRawEvent();
+
+        var uniqueViolation = new DbUpdateException(
+            "Conflict",
+            new FakeDbException("duplicate key value violates unique constraint"));
+
+        _repositoryMock
+            .Setup(r => r.AddAsync(It.IsAny<ProcessedEvent>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(uniqueViolation);
+
+        // Should not throw — the service swallows unique-violation errors.
+        Func<Task> act = () => _service.ConsumeAsync(validEvent, CancellationToken.None);
+        await act.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task ConsumeAsync_DuplicateEvent_ShouldNotPropagateException()
+    {
+        // "23505" is the Postgres error code for unique_violation
+        var validEvent = CreateValidRawEvent();
+        var uniqueViolation = new DbUpdateException(
+            "Conflict",
+            new FakeDbException("ERROR: 23505 duplicate"));
+
+        _repositoryMock
+            .Setup(r => r.AddAsync(It.IsAny<ProcessedEvent>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(uniqueViolation);
+
+        Func<Task> act = () => _service.ConsumeAsync(validEvent, CancellationToken.None);
+        await act.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task ConsumeAsync_NonUniqueDbUpdateException_ShouldRethrow()
+    {
+        // A DbUpdateException whose InnerException is a plain Exception (not DbException)
+        // should NOT be caught — it must bubble up.
+        var validEvent = CreateValidRawEvent();
+        var unrelatedDbException = new DbUpdateException("Unrelated DB error", new InvalidOperationException("disk full"));
+
+        _repositoryMock
+            .Setup(r => r.AddAsync(It.IsAny<ProcessedEvent>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(unrelatedDbException);
+
+        Func<Task> act = () => _service.ConsumeAsync(validEvent, CancellationToken.None);
+        await act.Should().ThrowAsync<DbUpdateException>();
+    }
+
+    // -------------------------------------------------------------------------
+    // Helper
+    // -------------------------------------------------------------------------
+
+    private static RawEvent CreateValidRawEvent() =>
+        new RawEvent
         {
             EventId = Guid.NewGuid(),
             ProjectId = Guid.NewGuid(),
@@ -86,5 +255,4 @@ public class EventProcessorServiceTests
             UserId = "user-123",
             ClientTimestamp = DateTimeOffset.UtcNow
         };
-    }
 }

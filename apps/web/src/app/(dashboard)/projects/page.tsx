@@ -4,10 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "../dashboard.module.css";
 import { analytics } from "@mcollector/sdk";
-import { authFetch, logout } from "@/lib/auth";
+import { authFetch } from "@/lib/auth";
 import { copyToClipboard } from "@/lib/clipboard";
 import { BASE_URL } from "@/lib/constants";
-import ConfirmModal from "@/components/ConfirmModal";
 
 type Project = {
   id: string;
@@ -15,10 +14,6 @@ type Project = {
   apiKey: string;
 };
 
-type UserProfile = {
-  id: string;
-  email: string | null;
-};
 
 type CreatedProject = {
   id: string;
@@ -26,23 +21,6 @@ type CreatedProject = {
   apiKey: string;
 };
 
-const LogoutIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-    <polyline points="16 17 21 12 16 7"/>
-    <line x1="21" y1="12" x2="9" y2="12"/>
-  </svg>
-);
-
-const TrashIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="3 6 5 6 21 6"/>
-    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-    <path d="M10 11v6"/>
-    <path d="M14 11v6"/>
-    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-  </svg>
-);
 
 const EyeIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -63,15 +41,12 @@ export default function ProjectsPage() {
   const createInputRef = useRef<HTMLInputElement>(null);
 
   const [projects, setProjects] = useState<Project[]>([]);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [newProjectName, setNewProjectName] = useState("");
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [createdProject, setCreatedProject] = useState<CreatedProject | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
-  const [deleteAccountConfirm, setDeleteAccountConfirm] = useState(false);
-  const [deletingAccount, setDeletingAccount] = useState(false);
 
 
   const [renameTarget, setRenameTarget] = useState<Project | null>(null);
@@ -97,13 +72,10 @@ export default function ProjectsPage() {
       return;
     }
 
-    Promise.all([
-      authFetch(`${BASE_URL}/api/projects`, router).then((res) => res.json()),
-      authFetch(`${BASE_URL}/api/users/me`, router).then((res) => res.json()),
-    ])
-      .then(([projectsData, profileData]) => {
+    authFetch(`${BASE_URL}/api/projects`, router)
+      .then((res) => res.json())
+      .then((projectsData) => {
         setProjects(projectsData);
-        setUserProfile(profileData);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -201,21 +173,7 @@ export default function ProjectsPage() {
     setCopied(false);
   }
 
-  async function deleteAccount() {
-    if (deletingAccount) return;
-    setDeletingAccount(true);
-    try {
-      await authFetch(`${BASE_URL}/api/users/me`, router, { method: "DELETE" });
-      localStorage.removeItem("token");
-      localStorage.removeItem("refreshToken");
-      router.push("/login");
-    } catch {
-      setError("Не удалось удалить аккаунт");
-      setDeletingAccount(false);
-    }
-  }
-
-  const filteredProjects = projects.filter((p) =>
+const filteredProjects = projects.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -241,25 +199,6 @@ export default function ProjectsPage() {
           {projects.length > 0 && (
             <p className={styles.subtitle}>{projects.length} {projects.length === 1 ? "проект" : projects.length < 5 ? "проекта" : "проектов"}</p>
           )}
-        </div>
-        <div className={styles.userInfo}>
-          {userProfile?.email && (
-            <span className={styles.userEmail}>{userProfile.email}</span>
-          )}
-          <button
-            className={styles.iconButton}
-            onClick={() => logout(router)}
-            title="Выйти"
-          >
-            <LogoutIcon />
-          </button>
-          <button
-            className={styles.iconButtonDanger}
-            onClick={() => setDeleteAccountConfirm(true)}
-            title="Удалить аккаунт"
-          >
-            <TrashIcon />
-          </button>
         </div>
       </div>
 
@@ -469,16 +408,6 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {deleteAccountConfirm && (
-        <ConfirmModal
-          title="Удалить аккаунт?"
-          message="Все ваши проекты и данные будут удалены безвозвратно. Это действие нельзя отменить"
-          confirmLabel={deletingAccount ? "Удаление..." : "Удалить аккаунт"}
-          danger
-          onConfirm={deleteAccount}
-          onCancel={() => setDeleteAccountConfirm(false)}
-        />
-      )}
 
       {createdProject && (
         <div className={styles.modalOverlay}>

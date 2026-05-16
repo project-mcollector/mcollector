@@ -17,7 +17,7 @@ public class UsersController(IUsersService usersService) : ApiControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetCurrentUser(CancellationToken cancellationToken)
     {
-        var result = await usersService.GetCurrentUserAsync(UserId!, cancellationToken);
+        var result = await usersService.GetCurrentUserAsync(RequiredUserId, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : NotFound();
     }
 
@@ -27,7 +27,7 @@ public class UsersController(IUsersService usersService) : ApiControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteAccount(CancellationToken cancellationToken)
     {
-        var result = await usersService.DeleteAccountAsync(UserId!, cancellationToken);
+        var result = await usersService.DeleteAccountAsync(RequiredUserId, cancellationToken);
         return result.IsSuccess ? NoContent() : NotFound();
     }
 }

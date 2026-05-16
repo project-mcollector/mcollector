@@ -117,6 +117,7 @@ services:
       - Jwt__Secret=${JWT_SECRET:?JWT_SECRET must be set}
       - AllowedOrigins=http://localhost:3000
       - RESEND_APITOKEN=${RESEND_APITOKEN:?RESEND_APITOKEN must be set}
+      - Passkey__ServerDomain=localhost
       - FrontendUrl=http://localhost:3000
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]

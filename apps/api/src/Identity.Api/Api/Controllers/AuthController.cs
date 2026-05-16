@@ -1,6 +1,8 @@
 using Identity.Api.Api.Requests;
 using Identity.Api.Application.Services;
+using Identity.Api.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -8,7 +10,7 @@ namespace Identity.Api.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class AuthController(IAuthService authService) : ApiControllerBase
+public class AuthController(IAuthService authService, UserManager<ApplicationUser> userManager) : ApiControllerBase
 {
     [HttpPost("login")]
     [EnableRateLimiting("auth")]
@@ -18,9 +20,11 @@ public class AuthController(IAuthService authService) : ApiControllerBase
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
     {
         var result = await authService.LoginAsync(request.Email, request.Password, cancellationToken);
-        if (result.IsSuccess) return Ok(result.Value);
-        if (result.Error?.Id == "Email.NotConfirmed") return StatusCode(403);
-        return Unauthorized();
+        return result.IsSuccess
+            ? Ok(result.Value)
+            : result.Error.Id == "Email.NotConfirmed"
+                ? Forbid()
+                : Unauthorized();
     }
 
     [HttpPost("register")]
@@ -30,7 +34,61 @@ public class AuthController(IAuthService authService) : ApiControllerBase
     public async Task<IActionResult> Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
     {
         var result = await authService.RegisterAsync(request.Email, request.Password, cancellationToken);
-        return result.IsSuccess ? Created() : BadRequest(result.Error?.Description);
+        return result.IsSuccess ? Created() : BadRequest(result.Error.Description);
+    }
+
+    [HttpPost("passkey/options")]
+    [EnableRateLimiting("auth")]
+    [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetPasskeyOptions([FromBody] PasskeyOptionsRequest request)
+    {
+        var result = string.IsNullOrEmpty(request.Email)
+            ? await authService.BeginDiscoverablePasskeyLoginAsync()
+            : await authService.BeginPasskeyLoginAsync(request.Email);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Error.Description);
+    }
+
+    [HttpPost("passkey/login")]
+    [EnableRateLimiting("auth")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> PasskeyLogin([FromBody] PasskeyCredentialRequest request)
+    {
+        var result = await authService.CompletePasskeyLoginAsync(request.CredentialJson);
+        return result.IsSuccess ? Ok(result.Value) : Unauthorized(result.Error.Description);
+    }
+
+    [Authorize]
+    [HttpPost("passkey/register/options")]
+    [EnableRateLimiting("api")]
+    [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetPasskeyRegistrationOptions()
+    {
+        // Passkey creation supported for existing accounts only
+        var user = await GetCurrentUserAsync();
+        if (user is null) return Unauthorized();
+
+        var result = await authService.BeginPasskeyRegistrationAsync(user);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Error.Description);
+    }
+
+    [Authorize]
+    [HttpPost("passkey/register")]
+    [EnableRateLimiting("api")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> RegisterPasskey([FromBody] PasskeyCredentialRequest request)
+    {
+        // Passkey creation supported for existing accounts only
+        var user = await GetCurrentUserAsync();
+        if (user is null) return Unauthorized();
+
+        var result = await authService.CompletePasskeyRegistrationAsync(user, request.CredentialJson);
+        return result.IsSuccess ? Ok() : BadRequest(result.Error.Description);
     }
 
     [HttpPost("confirm-email")]
@@ -41,13 +99,14 @@ public class AuthController(IAuthService authService) : ApiControllerBase
         CancellationToken cancellationToken)
     {
         var result = await authService.ConfirmEmail(request.UserId, request.Token, cancellationToken);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Error?.Description);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Error.Description);
     }
 
     [HttpPost("resend-confirmation")]
     [EnableRateLimiting("auth")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    public async Task<IActionResult> ResendConfirmation([FromBody] ResendConfirmationRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> ResendConfirmation([FromBody] ResendConfirmationRequest request,
+        CancellationToken cancellationToken)
     {
         await authService.ResendConfirmationEmailAsync(request.Email, cancellationToken);
         return NoContent();
@@ -66,7 +125,8 @@ public class AuthController(IAuthService authService) : ApiControllerBase
     [HttpPost("forgot-password")]
     [EnableRateLimiting("auth")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request,
+        CancellationToken cancellationToken)
     {
         await authService.ForgotPasswordAsync(request.Email, cancellationToken);
         return NoContent();
@@ -76,10 +136,11 @@ public class AuthController(IAuthService authService) : ApiControllerBase
     [EnableRateLimiting("auth")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request,
+        CancellationToken cancellationToken)
     {
         var result = await authService.ResetPasswordAsync(request.UserId, request.Token, request.Password, cancellationToken);
-        return result.IsSuccess ? NoContent() : BadRequest(result.Error?.Description);
+        return result.IsSuccess ? NoContent() : BadRequest(result.Error.Description);
     }
 
     [HttpPost("logout")]
@@ -98,10 +159,13 @@ public class AuthController(IAuthService authService) : ApiControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> LogoutOther([FromBody] RevokeRequest request, CancellationToken cancellationToken)
     {
-        if (UserId is null)
-            return Unauthorized();
-
-        await authService.RevokeOtherSessionsAsync(request.RefreshToken, UserId, cancellationToken);
+        await authService.RevokeOtherSessionsAsync(request.RefreshToken, RequiredUserId, cancellationToken);
         return NoContent();
+    }
+
+    private async Task<ApplicationUser?> GetCurrentUserAsync()
+    {
+        if (UserId is null) return null;
+        return await userManager.FindByIdAsync(UserId);
     }
 }

@@ -230,12 +230,20 @@ jobs:
           gcloud compute ssh ${{ secrets.VM_USER }}@mcollector-vm \
             --zone=${{ secrets.VM_ZONE }} \
             --project=${{ secrets.GCP_PROJECT_ID }} \
-            --command="mkdir -p ~/mcollector/infrastructure/docker"
+            --command="mkdir -p ~/mcollector/infrastructure/docker/prometheus ~/mcollector/infrastructure/docker/grafana/provisioning/datasources"
 
-      - name: Copy docker-compose to VM
+      - name: Copy infrastructure configs to VM
         run: |
           gcloud compute scp infrastructure/docker/docker-compose.prod.yml \
             ${{ secrets.VM_USER }}@mcollector-vm:~/mcollector/infrastructure/docker/docker-compose.prod.yml \
+            --zone=${{ secrets.VM_ZONE }} \
+            --project=${{ secrets.GCP_PROJECT_ID }}
+          gcloud compute scp infrastructure/docker/prometheus/prometheus.yml \
+            ${{ secrets.VM_USER }}@mcollector-vm:~/mcollector/infrastructure/docker/prometheus/prometheus.yml \
+            --zone=${{ secrets.VM_ZONE }} \
+            --project=${{ secrets.GCP_PROJECT_ID }}
+          gcloud compute scp infrastructure/docker/grafana/provisioning/datasources/prometheus.yml \
+            ${{ secrets.VM_USER }}@mcollector-vm:~/mcollector/infrastructure/docker/grafana/provisioning/datasources/prometheus.yml \
             --zone=${{ secrets.VM_ZONE }} \
             --project=${{ secrets.GCP_PROJECT_ID }}
 
@@ -250,6 +258,7 @@ jobs:
           RESEND_FORWARD_TO: ${{ secrets.RESEND_FORWARD_TO }}
           RESEND_FORWARD_FROM: ${{ secrets.RESEND_FORWARD_FROM }}
           FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
         run: |
           {
             echo "REGISTRY=${{ env.REGISTRY }}"
@@ -263,6 +272,7 @@ jobs:
             echo "RESEND_FORWARD_TO=${RESEND_FORWARD_TO}"
             echo "RESEND_FORWARD_FROM=${RESEND_FORWARD_FROM}"
             echo "FRONTEND_URL=${FRONTEND_URL}"
+            echo "GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}"
           } > /tmp/deploy.env
 
           gcloud compute scp /tmp/deploy.env \
@@ -298,4 +308,3 @@ jobs:
                 exit 1
               }
             "
-            

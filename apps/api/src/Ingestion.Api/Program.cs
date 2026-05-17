@@ -1,6 +1,7 @@
 using Contracts.Messages;
 using Infrastructure.Auth;
 using Infrastructure.Messaging;
+using Infrastructure.Observability;
 using Ingestion.Api.Infrastructure.HealthChecks;
 using Ingestion.Api.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -33,6 +34,8 @@ builder.Services.AddHealthChecks()
 
 builder.Services.AddApiKeyAuthentication();
 
+builder.Services.AddObservability("ingestion-api");
+
 builder.Services.AddAuthorizationBuilder()
     .SetDefaultPolicy(new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
@@ -43,6 +46,7 @@ var app = builder.Build();
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapMetricsEndpoint();
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
 app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {

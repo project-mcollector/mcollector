@@ -4,6 +4,7 @@ using Identity.Api.Domain.Entities;
 using Identity.Api.Infrastructure.HealthChecks;
 using Identity.Api.Infrastructure.Persistence;
 using Infrastructure.Auth;
+using Infrastructure.Observability;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
@@ -168,6 +169,8 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
 });
 
+builder.Services.AddObservability("identity-api");
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -196,6 +199,7 @@ app.UseAuthorization();
 
 app.UseRateLimiter();
 
+app.MapMetricsEndpoint();
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
 app.MapHealthChecks("/health/ready", new()

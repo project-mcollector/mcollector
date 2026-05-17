@@ -3,6 +3,7 @@ using Analytics.Api.Infrastructure.Persistence;
 using Analytics.Api.Infrastructure.Repositories;
 using Contracts.Messages;
 using Infrastructure.Auth;
+using Infrastructure.Observability;
 using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
@@ -46,6 +47,8 @@ builder.Services.AddAuthorizationBuilder()
 
 builder.Services.AddSharedAuthentication(builder.Configuration);
 
+builder.Services.AddObservability("analytics-api");
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -70,6 +73,7 @@ app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.MapMetricsEndpoint();
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
 app.MapHealthChecks("/health/ready", new HealthCheckOptions

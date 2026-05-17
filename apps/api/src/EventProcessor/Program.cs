@@ -3,6 +3,7 @@ using EventProcessor;
 using EventProcessor.Contracts;
 using EventProcessor.HealthChecks;
 using Infrastructure.Messaging;
+using Infrastructure.Observability;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +26,8 @@ builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"])
     .AddCheck<KafkaHealthCheck>("kafka", tags: ["ready"]);
 
+builder.Services.AddObservability("event-processor");
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -33,6 +36,7 @@ using (var scope = app.Services.CreateScope())
     dbContext.Database.Migrate();
 }
 
+app.MapMetricsEndpoint();
 app.MapHealthChecks("/health/live", new() { Predicate = _ => false });
 app.MapHealthChecks("/health/ready", new()
 {

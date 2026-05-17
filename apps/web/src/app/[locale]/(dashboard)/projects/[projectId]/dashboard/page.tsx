@@ -225,7 +225,7 @@ export default function DashboardPage() {
     const base = analyticsBase(projectId);
 
     authFetch(
-      `${base}/events/timeseries?from=${from}&to=${to}&interval=day&eventName=${eventName}`,
+      `${base}/events/timeseries?from=${from}&to=${to}&interval=day&eventName=${encodeURIComponent(eventName)}`,
       router,
     )
       .then((r) => r.json())
@@ -295,7 +295,7 @@ export default function DashboardPage() {
     </div>
   );
 
-  if (loading)
+  if (loading && overview === null)
     return (
       <div className={styles.page}>
         {nav}

@@ -7,9 +7,33 @@ on:
     branches: [main]
 
 jobs:
-  # ── Checks (all run in parallel) ────────────────────────────────────────────
+  # ── Change detection ─────────────────────────────────────────────────────────
+
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+      js: ${{ steps.filter.outputs.js }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            api:
+              - 'apps/api/**'
+            js:
+              - 'apps/web/**'
+              - 'packages/**'
+              - 'pnpm-lock.yaml'
+              - 'turbo.json'
+              - 'package.json'
+
+  # ── Checks ───────────────────────────────────────────────────────────────────
 
   lint-api:
+    needs: [changes]
+    if: github.event_name == 'push' || needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,6 +49,8 @@ jobs:
         run: dotnet format apps/api/Api.sln --verify-no-changes
 
   check-js:
+    needs: [changes]
+    if: github.event_name == 'push' || needs.changes.outputs.js == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,6 +59,11 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
+      - uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-
       - run: pnpm install --frozen-lockfile
       - name: Build, lint, typecheck, test
         env:
@@ -43,6 +74,8 @@ jobs:
         run: pnpm turbo run build lint typecheck test
 
   test-api:
+    needs: [changes]
+    if: github.event_name == 'push' || needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -61,7 +94,11 @@ jobs:
 
   publish-sdk:
     needs: [lint-api, check-js, test-api]
-    if: github.ref == 'refs/heads/main'
+    if: |
+      github.ref == 'refs/heads/main' &&
+      (needs.lint-api.result == 'success' || needs.lint-api.result == 'skipped') &&
+      (needs.check-js.result == 'success' || needs.check-js.result == 'skipped') &&
+      (needs.test-api.result == 'success' || needs.test-api.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -71,6 +108,11 @@ jobs:
           node-version: 20
           registry-url: https://registry.npmjs.org
           cache: pnpm
+      - uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-
       - run: pnpm install --frozen-lockfile
       - name: Build SDK
         run: pnpm turbo run build --filter @mcollector/sdk
@@ -93,10 +135,17 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   # ── Docker builds (main only, API services run in parallel via matrix) ───────
+  # Deploy uses IMAGE_TAG=${{ github.sha }} for all services, so all images must
+  # be rebuilt on every main push regardless of what changed. The GHA layer cache
+  # makes rebuilds fast when source is unchanged.
 
   build-and-push-api:
     needs: [lint-api, check-js, test-api]
-    if: github.ref == 'refs/heads/main'
+    if: |
+      github.ref == 'refs/heads/main' &&
+      (needs.lint-api.result == 'success' || needs.lint-api.result == 'skipped') &&
+      (needs.check-js.result == 'success' || needs.check-js.result == 'skipped') &&
+      (needs.test-api.result == 'success' || needs.test-api.result == 'skipped')
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -109,51 +158,58 @@ jobs:
       REGISTRY: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/mcollector
     steps:
       - uses: actions/checkout@v4
-      - uses: google-github-actions/auth@v2
+      - uses: docker/login-action@v3
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-      - uses: google-github-actions/setup-gcloud@v2
-      - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev --quiet
+          registry: ${{ secrets.GCP_REGION }}-docker.pkg.dev
+          username: _json_key
+          password: ${{ secrets.GCP_SA_KEY }}
+      - uses: docker/setup-buildx-action@v3
       - name: Build and push ${{ matrix.service.name }}
-        run: |
-          TAG=${{ github.sha }}
-          docker build \
-            -t "${{ env.REGISTRY }}/${{ matrix.service.name }}:$TAG" \
-            -t "${{ env.REGISTRY }}/${{ matrix.service.name }}:latest" \
-            -f "${{ matrix.service.dockerfile }}" \
-            apps/api
-          docker push "${{ env.REGISTRY }}/${{ matrix.service.name }}:$TAG"
-          docker push "${{ env.REGISTRY }}/${{ matrix.service.name }}:latest"
+        uses: docker/build-push-action@v5
+        with:
+          context: apps/api
+          file: ${{ matrix.service.dockerfile }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ matrix.service.name }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ matrix.service.name }}:latest
+          cache-from: type=gha,scope=${{ matrix.service.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service.name }}
 
   build-and-push-web:
     needs: [lint-api, check-js, test-api]
-    if: github.ref == 'refs/heads/main'
+    if: |
+      github.ref == 'refs/heads/main' &&
+      (needs.lint-api.result == 'success' || needs.lint-api.result == 'skipped') &&
+      (needs.check-js.result == 'success' || needs.check-js.result == 'skipped') &&
+      (needs.test-api.result == 'success' || needs.test-api.result == 'skipped')
     runs-on: ubuntu-latest
     env:
       REGISTRY: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/mcollector
     steps:
       - uses: actions/checkout@v4
-      - uses: google-github-actions/auth@v2
+      - uses: docker/login-action@v3
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-      - uses: google-github-actions/setup-gcloud@v2
-      - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev --quiet
+          registry: ${{ secrets.GCP_REGION }}-docker.pkg.dev
+          username: _json_key
+          password: ${{ secrets.GCP_SA_KEY }}
+      - uses: docker/setup-buildx-action@v3
       - name: Build and push web
-        run: |
-          TAG=${{ github.sha }}
-          docker build \
-            -t "${{ env.REGISTRY }}/web:$TAG" \
-            -t "${{ env.REGISTRY }}/web:latest" \
-            --build-arg NEXT_PUBLIC_BASE_URL=${{ secrets.WEB_BASE_URL }} \
-            --build-arg NEXT_PUBLIC_ANALYTICS_API_KEY=${{ secrets.WEB_ANALYTICS_API_KEY }} \
-            --build-arg NEXT_PUBLIC_ANALYTICS_PROJECT_ID=${{ secrets.WEB_ANALYTICS_PROJECT_ID }} \
-            --build-arg NEXT_PUBLIC_ANALYTICS_API_HOST=${{ secrets.WEB_BASE_URL }} \
-            -f apps/web/Dockerfile \
-            .
-          docker push "${{ env.REGISTRY }}/web:$TAG"
-          docker push "${{ env.REGISTRY }}/web:latest"
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/web:${{ github.sha }}
+            ${{ env.REGISTRY }}/web:latest
+          build-args: |
+            NEXT_PUBLIC_BASE_URL=${{ secrets.WEB_BASE_URL }}
+            NEXT_PUBLIC_ANALYTICS_API_KEY=${{ secrets.WEB_ANALYTICS_API_KEY }}
+            NEXT_PUBLIC_ANALYTICS_PROJECT_ID=${{ secrets.WEB_ANALYTICS_PROJECT_ID }}
+            NEXT_PUBLIC_ANALYTICS_API_HOST=${{ secrets.WEB_BASE_URL }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
 
   # ── Deploy ───────────────────────────────────────────────────────────────────
 
@@ -242,3 +298,4 @@ jobs:
                 exit 1
               }
             "
+            

@@ -84,6 +84,13 @@ public class SdkFlowTests
 
         _analyticsClient.DefaultRequestHeaders.Authorization =
             new("Bearer", GenerateJwt());
+
+        var analyticsDbOptions = new DbContextOptionsBuilder<AnalyticsDbContext>()
+            .UseInMemoryDatabase(_dbName, InMemoryDbRoot)
+            .Options;
+        using var analyticsDb = new AnalyticsDbContext(analyticsDbOptions);
+        analyticsDb.UserProjects.Add(new UserProject { ProjectsId = _projectId, UsersId = "integration-user" });
+        analyticsDb.SaveChanges();
     }
 
     [Fact]

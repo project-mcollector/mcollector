@@ -10,6 +10,7 @@ public class Worker(
     IConfiguration configuration,
     IServiceProvider serviceProvider) : BackgroundService
 {
+    private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
         return Task.Run(async () =>
@@ -39,8 +40,7 @@ public class Worker(
                         if (logger.IsEnabled(LogLevel.Debug))
                             logger.LogDebug("Received message: {Message}", consumeResult.Message.Value);
 
-                        var rawEvent = JsonSerializer.Deserialize<RawEvent>(consumeResult.Message.Value,
-                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        var rawEvent = JsonSerializer.Deserialize<RawEvent>(consumeResult.Message.Value, _jsonOptions);
 
                         if (rawEvent != null)
                         {

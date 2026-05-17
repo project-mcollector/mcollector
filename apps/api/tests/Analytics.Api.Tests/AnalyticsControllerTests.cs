@@ -18,8 +18,10 @@ public class AnalyticsControllerTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options);
 
-    private static AnalyticsController CreateController(AnalyticsDbContext dbContext)
+    private static AnalyticsController CreateController(AnalyticsDbContext dbContext, Guid projectId)
     {
+        dbContext.UserProjects.Add(new UserProject { ProjectsId = projectId, UsersId = TestUserId });
+        dbContext.SaveChanges();
         var controller = new AnalyticsController(dbContext);
         controller.ControllerContext = new ControllerContext
         {
@@ -56,7 +58,7 @@ public class AnalyticsControllerTests
         ]);
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetOverview(projectId, null, null, CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -83,7 +85,7 @@ public class AnalyticsControllerTests
         });
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetOverview(projectId, null, null, CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -109,7 +111,7 @@ public class AnalyticsControllerTests
         ]);
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetOverview(projectId, from: cutoff, to: null, CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -133,7 +135,7 @@ public class AnalyticsControllerTests
         ]);
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetOverview(projectId, from: null, to: cutoff, CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -156,7 +158,7 @@ public class AnalyticsControllerTests
         ]);
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectA)
             .GetOverview(projectA, null, null, CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -183,7 +185,7 @@ public class AnalyticsControllerTests
         ]);
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetEvents(projectId, CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -210,7 +212,7 @@ public class AnalyticsControllerTests
         });
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetEvents(projectId, CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -232,7 +234,7 @@ public class AnalyticsControllerTests
         ]);
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectA)
             .GetEvents(projectA, CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -263,7 +265,7 @@ public class AnalyticsControllerTests
         ]);
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetEventProperties(projectId, "$pageview", CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -291,7 +293,7 @@ public class AnalyticsControllerTests
         await dbContext.SaveChangesAsync();
 
         // Should not throw; malformed entry is silently skipped
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetEventProperties(projectId, "click", CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -316,7 +318,7 @@ public class AnalyticsControllerTests
         ]);
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetEventProperties(projectId, "click", CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -340,7 +342,7 @@ public class AnalyticsControllerTests
         ]);
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetEventProperties(projectId, "click", CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -372,7 +374,7 @@ public class AnalyticsControllerTests
         dbContext.ProcessedEvents.AddRange(events);
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetEventProperties(projectId, "load", CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -400,7 +402,7 @@ public class AnalyticsControllerTests
         ]);
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetEventCounts(projectId, null, null, null, CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -430,7 +432,7 @@ public class AnalyticsControllerTests
         });
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetEventCounts(projectId, null, null, null, CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -455,7 +457,7 @@ public class AnalyticsControllerTests
         ]);
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetEventCounts(projectId, from: windowStart, to: windowEnd, period: null, CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -487,7 +489,7 @@ public class AnalyticsControllerTests
 
         // Pass a very old from that would include the ancient event — period should override it
         var ancientFrom = new DateTimeOffset(1990, 1, 1, 0, 0, 0, TimeSpan.Zero);
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetEventCounts(projectId, from: ancientFrom, to: null, period: period, CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -514,7 +516,7 @@ public class AnalyticsControllerTests
         ]);
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectA)
             .GetEventCounts(projectA, null, null, null, CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -542,7 +544,7 @@ public class AnalyticsControllerTests
         var from = DateTimeOffset.UtcNow.AddDays(-7);
         var to = DateTimeOffset.UtcNow;
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetEventsTimeseries(projectId, from, to, interval, null, CancellationToken.None);
 
         Assert.IsType<BadRequestObjectResult>(result);
@@ -570,7 +572,7 @@ public class AnalyticsControllerTests
         });
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetEventsTimeseries(projectId, from, to, interval, null, CancellationToken.None);
 
         Assert.IsType<OkObjectResult>(result);
@@ -595,7 +597,7 @@ public class AnalyticsControllerTests
         ]);
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetEventsTimeseries(projectId, from, to, "day", null, CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -625,7 +627,7 @@ public class AnalyticsControllerTests
         ]);
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetEventsTimeseries(projectId, from, to, "hour", null, CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -655,7 +657,7 @@ public class AnalyticsControllerTests
         ]);
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetEventsTimeseries(projectId, from, to, "month", null, CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -683,7 +685,7 @@ public class AnalyticsControllerTests
         ]);
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetEventsTimeseries(projectId, from, to, "day", "target", CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -701,7 +703,7 @@ public class AnalyticsControllerTests
         var from = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
         var to = new DateTimeOffset(2024, 1, 31, 23, 59, 59, TimeSpan.Zero);
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetEventsTimeseries(projectId, from, to, "Day", null, CancellationToken.None);
 
         Assert.IsType<OkObjectResult>(result);
@@ -725,7 +727,7 @@ public class AnalyticsControllerTests
         ]);
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectA)
             .GetEventsTimeseries(projectA, from, to, "day", null, CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -751,7 +753,7 @@ public class AnalyticsControllerTests
         var from = DateTimeOffset.UtcNow.AddDays(-7);
         var to = DateTimeOffset.UtcNow;
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetUsersTimeseries(projectId, from, to, interval, CancellationToken.None);
 
         Assert.IsType<BadRequestObjectResult>(result);
@@ -779,7 +781,7 @@ public class AnalyticsControllerTests
         });
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetUsersTimeseries(projectId, from, to, interval, CancellationToken.None);
 
         Assert.IsType<OkObjectResult>(result);
@@ -808,7 +810,7 @@ public class AnalyticsControllerTests
         ]);
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetUsersTimeseries(projectId, from, to, "day", CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -839,7 +841,7 @@ public class AnalyticsControllerTests
         ]);
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetUsersTimeseries(projectId, from, to, "hour", CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -868,7 +870,7 @@ public class AnalyticsControllerTests
         ]);
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetUsersTimeseries(projectId, from, to, "month", CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);
@@ -887,7 +889,7 @@ public class AnalyticsControllerTests
         var from = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
         var to = new DateTimeOffset(2024, 1, 31, 23, 59, 59, TimeSpan.Zero);
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectId)
             .GetUsersTimeseries(projectId, from, to, "Month", CancellationToken.None);
 
         Assert.IsType<OkObjectResult>(result);
@@ -913,7 +915,7 @@ public class AnalyticsControllerTests
         ]);
         await dbContext.SaveChangesAsync();
 
-        var result = await CreateController(dbContext)
+        var result = await CreateController(dbContext, projectA)
             .GetUsersTimeseries(projectA, from, to, "day", CancellationToken.None) as OkObjectResult;
 
         Assert.NotNull(result);

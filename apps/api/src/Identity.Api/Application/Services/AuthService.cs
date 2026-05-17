@@ -133,29 +133,43 @@ public class AuthService(
     {
         var now = dateTimeProvider.UtcNow;
 
+        // Only fetch tokens that are still valid — already-revoked tokens fall through to the reuse check below
         var token = await dbContext.RefreshTokens
             .Include(t => t.User)
-            .SingleOrDefaultAsync(t => t.Token == refreshToken, cancellationToken);
+            .SingleOrDefaultAsync(t => t.Token == refreshToken && t.RevokedAt == null && t.ExpiresAt > now,
+                cancellationToken);
 
-        if (token is null || token.IsExpired(now))
+        if (token is null)
+        {
+            // If the token exists but is already revoked, that is token reuse by an attacker
+            var stolenUserId = await dbContext.RefreshTokens
+                .Where(t => t.Token == refreshToken && t.RevokedAt != null)
+                .Select(t => t.UserId)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (stolenUserId is not null)
+            {
+                await dbContext.RefreshTokens
+                    .Where(t => t.UserId == stolenUserId && t.RevokedAt == null)
+                    .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, now), cancellationToken);
+
+                if (logger.IsEnabled(LogLevel.Warning))
+                    logger.LogWarning("Refresh token reuse detected for user {UserId} — all sessions revoked",
+                        stolenUserId);
+            }
+
             return Errors.Unauthorized("Invalid or expired refresh token");
+        }
 
+        // Atomically revoke the token; if another concurrent request already revoked it, just return 401
         var revoked = await dbContext.RefreshTokens
             .Where(t => t.Token == refreshToken && t.RevokedAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, now), cancellationToken);
 
-        if (revoked != 0)
-            return await tokenService.CreateTokenAsync(token.User, cancellationToken);
+        if (revoked == 0)
+            return Errors.Unauthorized("Invalid or expired refresh token");
 
-        await dbContext.RefreshTokens
-            .Where(t => t.UserId == token.UserId && t.RevokedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, now), cancellationToken);
-
-        if (logger.IsEnabled(LogLevel.Warning))
-            logger.LogWarning("Refresh token reuse detected for user {UserId} — all sessions revoked",
-                token.UserId);
-
-        return Errors.Unauthorized("Invalid or expired refresh token");
+        return await tokenService.CreateTokenAsync(token.User, cancellationToken);
     }
 
     public async Task RevokeAsync(string refreshToken, CancellationToken cancellationToken = default)

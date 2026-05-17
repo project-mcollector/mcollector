@@ -2,6 +2,7 @@ using Analytics.Api.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using System.Text.Json;
 
 namespace Analytics.Api.API.Controllers;
@@ -11,6 +12,17 @@ namespace Analytics.Api.API.Controllers;
 [Authorize]
 public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
 {
+    private string? UserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+    private async Task<bool> IsProjectMemberAsync(Guid projectId, CancellationToken cancellationToken)
+    {
+        var userId = UserId;
+        if (string.IsNullOrEmpty(userId)) return false;
+        return await dbContext.UserProjects
+            .AsNoTracking()
+            .AnyAsync(up => up.ProjectsId == projectId && up.UsersId == userId, cancellationToken);
+    }
+
     [HttpGet("overview")]
     public async Task<IActionResult> GetOverview(
         Guid projectId,
@@ -18,6 +30,8 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
         [FromQuery] DateTimeOffset? to,
         CancellationToken cancellationToken)
     {
+        if (!await IsProjectMemberAsync(projectId, cancellationToken)) return Forbid();
+
         var query = dbContext.ProcessedEvents.AsNoTracking().Where(e => e.ProjectId == projectId);
 
         if (from.HasValue) query = query.Where(e => e.Timestamp >= from.Value);
@@ -33,6 +47,8 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
     [HttpGet("events")]
     public async Task<IActionResult> GetEvents(Guid projectId, CancellationToken cancellationToken)
     {
+        if (!await IsProjectMemberAsync(projectId, cancellationToken)) return Forbid();
+
         var rawEvents = await dbContext.ProcessedEvents
             .AsNoTracking()
             .Where(e => e.ProjectId == projectId)
@@ -46,6 +62,8 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
     [HttpGet("events/{eventName}/properties")]
     public async Task<IActionResult> GetEventProperties(Guid projectId, string eventName, CancellationToken cancellationToken)
     {
+        if (!await IsProjectMemberAsync(projectId, cancellationToken)) return Forbid();
+
         const int sampleSize = 100;
 
         var jsonStrings = await dbContext.ProcessedEvents
@@ -84,6 +102,8 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
         [FromQuery] string? period,
         CancellationToken cancellationToken)
     {
+        if (!await IsProjectMemberAsync(projectId, cancellationToken)) return Forbid();
+
         if (period is "day" or "week" or "month")
         {
             var now = DateTimeOffset.UtcNow;
@@ -119,6 +139,7 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
         [FromQuery] string? eventName = null,
         CancellationToken cancellationToken = default)
     {
+        if (!await IsProjectMemberAsync(projectId, cancellationToken)) return Forbid();
         if (!IsValidInterval(interval))
             return BadRequest(new { error = $"Invalid interval '{interval}'. Allowed values: hour, day, month." });
 
@@ -171,6 +192,7 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
         [FromQuery] string interval = "day",
         CancellationToken cancellationToken = default)
     {
+        if (!await IsProjectMemberAsync(projectId, cancellationToken)) return Forbid();
         if (!IsValidInterval(interval))
             return BadRequest(new { error = $"Invalid interval '{interval}'. Allowed values: hour, day, month." });
 

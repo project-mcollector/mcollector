@@ -24,6 +24,8 @@ public class RegisterRequest
     [MinLength(8)]
     [MaxLength(128)]
     public required string Password { get; init; }
+
+    public string? Locale { get; init; }
 }
 
 public class RefreshRequest
@@ -41,6 +43,8 @@ public class ResendConfirmationRequest
     [Required]
     [ValidEmail]
     public required string Email { get; init; }
+
+    public string? Locale { get; init; }
 }
 
 public class ForgotPasswordRequest
@@ -48,6 +52,8 @@ public class ForgotPasswordRequest
     [Required]
     [ValidEmail]
     public required string Email { get; init; }
+
+    public string? Locale { get; init; }
 }
 
 public class ResetPasswordRequest

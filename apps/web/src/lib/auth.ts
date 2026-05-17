@@ -1,5 +1,6 @@
-import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { BASE_URL } from "./constants";
+
+type PushRouter = { push: (href: string) => void };
 
 let refreshPromise: Promise<string | null> | null = null;
 
@@ -69,7 +70,7 @@ export function isTokenFresh(token: string): boolean {
 
 export function authFetch(
   url: string,
-  router: AppRouterInstance,
+  router: PushRouter,
   options: RequestInit = {}
 ): Promise<Response> {
   const token = localStorage.getItem("token");
@@ -103,7 +104,7 @@ export function authFetch(
   });
 }
 
-export async function logout(router: AppRouterInstance): Promise<void> {
+export async function logout(router: PushRouter): Promise<void> {
   const refreshToken = localStorage.getItem("refreshToken");
   if (refreshToken) {
     try {

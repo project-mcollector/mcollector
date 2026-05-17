@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+
+  <data name="ConfirmSubject" xml:space="preserve"><value>确认您的邮箱</value></data>
+  <data name="ConfirmBody" xml:space="preserve"><value>感谢您的注册！请点击下方按钮确认您的邮箱地址：</value></data>
+  <data name="ConfirmButton" xml:space="preserve"><value>确认邮箱</value></data>
+  <data name="LinkFallback" xml:space="preserve"><value>如果按钮无效，请将链接复制到浏览器中：</value></data>
+  <data name="ResetSubject" xml:space="preserve"><value>重置您的密码</value></data>
+  <data name="ResetBody" xml:space="preserve"><value>您请求了密码重置。请点击下方按钮设置新密码：</value></data>
+  <data name="ResetButton" xml:space="preserve"><value>重置密码</value></data>
+  <data name="ResetIgnore" xml:space="preserve"><value>如果您没有请求重置密码，请忽略此邮件。</value></data>
+</root>

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { useRouter, usePathname, Link } from "@/i18n/navigation";
 import { FolderOpen, GalleryVerticalEnd, Settings } from "lucide-react";
 import {
   Sidebar,
@@ -27,17 +27,19 @@ type UserProfile = {
   userName: string | null;
 };
 
-const navItems = [
-  { title: "Projects", url: "/projects", icon: FolderOpen },
-  { title: "Settings", url: "/settings", icon: Settings },
-];
-
 export function AppSidebar() {
   const router = useRouter();
   const pathname = usePathname();
+  const t = useTranslations("nav");
+  const tModal = useTranslations("deleteAccountModal");
   const [user, setUser] = useState<UserProfile | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  const navItems = [
+    { title: t("projects"), url: "/projects", icon: FolderOpen },
+    { title: t("settings"), url: "/settings", icon: Settings },
+  ];
 
   useEffect(() => {
     authFetch(`${BASE_URL}/api/users/me`, router)
@@ -118,9 +120,9 @@ export function AppSidebar() {
 
       {deleteConfirm && (
         <ConfirmModal
-          title="Delete account?"
-          message="All your projects and data will be permanently deleted. This cannot be undone."
-          confirmLabel={deleting ? "Deleting…" : "Delete account"}
+          title={tModal("title")}
+          message={tModal("message")}
+          confirmLabel={deleting ? tModal("deleting") : tModal("confirm")}
           danger
           onConfirm={deleteAccount}
           onCancel={() => setDeleteConfirm(false)}

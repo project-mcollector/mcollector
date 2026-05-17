@@ -80,7 +80,7 @@ public class AuthControllerTests
     public async Task Register_DuplicateEmail_ReturnsBadRequest()
     {
         var authService = new Mock<IAuthService>();
-        authService.Setup(x => x.RegisterAsync("dup@acme.dev", It.IsAny<string>(), CancellationToken.None))
+        authService.Setup(x => x.RegisterAsync("dup@acme.dev", It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Errors.Validation("Registration", "Email already taken"));
 
         var controller = CreateController(authService);
@@ -95,7 +95,7 @@ public class AuthControllerTests
     public async Task Register_Success_ReturnsCreated()
     {
         var authService = new Mock<IAuthService>();
-        authService.Setup(x => x.RegisterAsync("new@acme.dev", "Password1!", CancellationToken.None))
+        authService.Setup(x => x.RegisterAsync("new@acme.dev", "Password1!", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Success());
 
         var controller = CreateController(authService);
@@ -181,7 +181,7 @@ public class AuthControllerTests
     public async Task ResendConfirmation_AlwaysReturnsNoContent()
     {
         var authService = new Mock<IAuthService>();
-        authService.Setup(x => x.ResendConfirmationEmailAsync("user@acme.dev", CancellationToken.None))
+        authService.Setup(x => x.ResendConfirmationEmailAsync("user@acme.dev", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Success());
 
         var controller = CreateController(authService);
@@ -198,7 +198,7 @@ public class AuthControllerTests
     public async Task ForgotPassword_AlwaysReturnsNoContent()
     {
         var authService = new Mock<IAuthService>();
-        authService.Setup(x => x.ForgotPasswordAsync("user@acme.dev", CancellationToken.None))
+        authService.Setup(x => x.ForgotPasswordAsync("user@acme.dev", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Success());
 
         var controller = CreateController(authService);

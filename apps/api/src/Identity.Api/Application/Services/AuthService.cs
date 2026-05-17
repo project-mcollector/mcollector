@@ -14,7 +14,7 @@ public interface IAuthService
 {
     Task<Result<AuthTokenDto>> LoginAsync(string email, string password, CancellationToken cancellationToken = default);
 
-    Task<Result> RegisterAsync(string email, string password,
+    Task<Result> RegisterAsync(string email, string password, string? locale = null,
         CancellationToken cancellationToken = default);
 
     Task<Result<string>> BeginPasskeyRegistrationAsync(ApplicationUser user);
@@ -32,8 +32,8 @@ public interface IAuthService
     Task<Result<AuthTokenDto>> ConfirmEmail(string userId, string emailToken,
         CancellationToken cancellationToken = default);
 
-    Task<Result> ResendConfirmationEmailAsync(string email, CancellationToken cancellationToken = default);
-    Task<Result> ForgotPasswordAsync(string email, CancellationToken cancellationToken = default);
+    Task<Result> ResendConfirmationEmailAsync(string email, string? locale = null, CancellationToken cancellationToken = default);
+    Task<Result> ForgotPasswordAsync(string email, string? locale = null, CancellationToken cancellationToken = default);
 
     Task<Result> ResetPasswordAsync(string userId, string token, string password,
         CancellationToken cancellationToken = default);
@@ -87,7 +87,7 @@ public class AuthService(
         return await tokenService.CreateTokenAsync(user, cancellationToken);
     }
 
-    public async Task<Result> RegisterAsync(string email, string password,
+    public async Task<Result> RegisterAsync(string email, string password, string? locale = null,
         CancellationToken cancellationToken = default)
     {
         var user = new ApplicationUser { Email = email, UserName = email };
@@ -104,7 +104,7 @@ public class AuthService(
         if (logger.IsEnabled(LogLevel.Information))
             logger.LogInformation("User {UserId} registered with email {Email}", user.Id, email);
 
-        return await mailService.SendConfirmationEmailAsync(user, cancellationToken);
+        return await mailService.SendConfirmationEmailAsync(user, locale, cancellationToken);
     }
 
     public async Task<Result<string>> BeginPasskeyRegistrationAsync(ApplicationUser user)
@@ -198,24 +198,24 @@ public class AuthService(
             : Errors.Validation("Email Confirmation", result.Error.Description);
     }
 
-    public async Task<Result> ResendConfirmationEmailAsync(string email, CancellationToken cancellationToken = default)
+    public async Task<Result> ResendConfirmationEmailAsync(string email, string? locale = null, CancellationToken cancellationToken = default)
     {
         var user = await userManager.FindByEmailAsync(email);
 
         if (user is null || user.EmailConfirmed)
             return Result.Success();
 
-        return await mailService.SendConfirmationEmailAsync(user, cancellationToken);
+        return await mailService.SendConfirmationEmailAsync(user, locale, cancellationToken);
     }
 
-    public async Task<Result> ForgotPasswordAsync(string email, CancellationToken cancellationToken = default)
+    public async Task<Result> ForgotPasswordAsync(string email, string? locale = null, CancellationToken cancellationToken = default)
     {
         var user = await userManager.FindByEmailAsync(email);
 
         if (user is null || !user.EmailConfirmed)
             return Result.Success();
 
-        return await mailService.SendPasswordResetEmailAsync(user, cancellationToken);
+        return await mailService.SendPasswordResetEmailAsync(user, locale, cancellationToken);
     }
 
     public async Task<Result> ResetPasswordAsync(string userId, string token, string password,

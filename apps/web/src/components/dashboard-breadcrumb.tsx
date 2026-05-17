@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { usePathname, useRouter, Link } from "@/i18n/navigation";
 import { authFetch } from "@/lib/auth";
 import { BASE_URL } from "@/lib/constants";
 import {
@@ -13,18 +14,19 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 
-const ROUTE_LABELS: Record<string, string> = {
-  projects: "Проекты",
-  settings: "Настройки",
-  dashboard: "Дашборд",
-};
-
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function DashboardBreadcrumb() {
   const pathname = usePathname();
   const router = useRouter();
+  const t = useTranslations("nav");
   const [projectNames, setProjectNames] = useState<Record<string, string>>({});
+
+  const ROUTE_LABELS: Record<string, string> = {
+    projects: t("projects"),
+    settings: t("settings"),
+    dashboard: t("dashboard"),
+  };
 
   const segments = pathname.split("/").filter(Boolean);
 
@@ -43,7 +45,6 @@ export function DashboardBreadcrumb() {
   const crumbs = segments.map((seg, i) => {
     const isUuid = UUID_RE.test(seg);
     const label = isUuid ? (projectNames[seg] ?? "…") : (ROUTE_LABELS[seg] ?? seg);
-    // UUID segments have no dedicated page — link straight to the dashboard sub-route
     const href = isUuid
       ? "/" + segments.slice(0, i + 1).join("/") + "/dashboard"
       : "/" + segments.slice(0, i + 1).join("/");
@@ -62,7 +63,9 @@ export function DashboardBreadcrumb() {
               {crumb.isLast ? (
                 <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
               ) : (
-                <BreadcrumbLink href={crumb.href}>{crumb.label}</BreadcrumbLink>
+                <BreadcrumbLink asChild>
+                  <Link href={crumb.href as Parameters<typeof Link>[0]["href"]}>{crumb.label}</Link>
+                </BreadcrumbLink>
               )}
             </BreadcrumbItem>
           </span>

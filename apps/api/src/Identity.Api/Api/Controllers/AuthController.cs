@@ -33,7 +33,7 @@ public class AuthController(IAuthService authService, UserManager<ApplicationUse
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
     {
-        var result = await authService.RegisterAsync(request.Email, request.Password, cancellationToken);
+        var result = await authService.RegisterAsync(request.Email, request.Password, request.Locale, cancellationToken);
         return result.IsSuccess ? Created() : BadRequest(result.Error.Description);
     }
 
@@ -141,7 +141,7 @@ public class AuthController(IAuthService authService, UserManager<ApplicationUse
     public async Task<IActionResult> ResendConfirmation([FromBody] ResendConfirmationRequest request,
         CancellationToken cancellationToken)
     {
-        await authService.ResendConfirmationEmailAsync(request.Email, cancellationToken);
+        await authService.ResendConfirmationEmailAsync(request.Email, request.Locale, cancellationToken);
         return NoContent();
     }
 
@@ -161,7 +161,7 @@ public class AuthController(IAuthService authService, UserManager<ApplicationUse
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request,
         CancellationToken cancellationToken)
     {
-        await authService.ForgotPasswordAsync(request.Email, cancellationToken);
+        await authService.ForgotPasswordAsync(request.Email, request.Locale, cancellationToken);
         return NoContent();
     }
 

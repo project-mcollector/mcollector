@@ -1,11 +1,13 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import styles from "./ConfirmModal.module.css";
 
 type Props = {
   title: string;
   message: string;
   confirmLabel?: string;
+  cancelLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
   danger?: boolean;
@@ -15,12 +17,15 @@ type Props = {
 export default function ConfirmModal({
   title,
   message,
-  confirmLabel = "Подтвердить",
+  confirmLabel,
+  cancelLabel,
   onConfirm,
   onCancel,
   danger = false,
   error,
 }: Props) {
+  const t = useTranslations("common");
+
   return (
     <div className={styles.overlay} onClick={onCancel}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
@@ -29,13 +34,13 @@ export default function ConfirmModal({
         {error && <p className={styles.error}>{error}</p>}
         <div className={styles.buttons}>
           <button className={styles.cancel} onClick={onCancel}>
-            Отмена
+            {cancelLabel ?? t("cancel")}
           </button>
           <button
             className={danger ? styles.danger : styles.confirm}
             onClick={onConfirm}
           >
-            {confirmLabel}
+            {confirmLabel ?? t("confirm")}
           </button>
         </div>
       </div>

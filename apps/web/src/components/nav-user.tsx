@@ -1,7 +1,9 @@
 "use client";
 
-import { ChevronsUpDown, LogOut, Trash2 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { ChevronsUpDown, Globe, LogOut, Trash2 } from "lucide-react";
+import { useTranslations, useLocale } from "next-intl";
+import { useRouter, usePathname } from "@/i18n/navigation";
+import { locales, localeLabels } from "@/i18n/locales";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -9,6 +11,9 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -27,6 +32,9 @@ interface NavUserProps {
 export function NavUser({ user, onDeleteAccount }: NavUserProps) {
   const { isMobile } = useSidebar();
   const router = useRouter();
+  const pathname = usePathname();
+  const locale = useLocale();
+  const t = useTranslations("nav");
 
   const initial = user?.email?.[0]?.toUpperCase() ?? "?";
   const displayName = user?.name ?? user?.email ?? "…";
@@ -76,14 +84,32 @@ export function NavUser({ user, onDeleteAccount }: NavUserProps) {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Globe className="size-4" />
+                {t("language")}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                {locales.map((l) => (
+                  <DropdownMenuItem
+                    key={l}
+                    onClick={() => router.replace(pathname, { locale: l })}
+                    className={locale === l ? "font-medium" : ""}
+                  >
+                    {localeLabels[l]}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => logout(router)}>
               <LogOut className="size-4" />
-              Log out
+              {t("logOut")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onClick={onDeleteAccount}>
               <Trash2 className="size-4" />
-              Delete account
+              {t("deleteAccount")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

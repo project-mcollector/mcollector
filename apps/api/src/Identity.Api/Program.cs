@@ -107,6 +107,8 @@ builder.Services.Configure<ResendClientOptions>(o =>
 });
 builder.Services.AddTransient<IResend, ResendClient>();
 
+builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
 builder.Services.AddControllers();

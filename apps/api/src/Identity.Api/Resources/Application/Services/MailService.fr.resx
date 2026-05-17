@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+
+  <data name="ConfirmSubject" xml:space="preserve"><value>Confirmez votre e-mail</value></data>
+  <data name="ConfirmBody" xml:space="preserve"><value>Merci de vous être inscrit ! Cliquez sur le bouton ci-dessous pour confirmer votre adresse e-mail :</value></data>
+  <data name="ConfirmButton" xml:space="preserve"><value>Confirmer l&apos;e-mail</value></data>
+  <data name="LinkFallback" xml:space="preserve"><value>Si le bouton ne fonctionne pas, copiez le lien dans votre navigateur :</value></data>
+  <data name="ResetSubject" xml:space="preserve"><value>Réinitialisation du mot de passe</value></data>
+  <data name="ResetBody" xml:space="preserve"><value>Vous avez demandé une réinitialisation de mot de passe. Cliquez sur le bouton ci-dessous pour définir un nouveau mot de passe :</value></data>
+  <data name="ResetButton" xml:space="preserve"><value>Réinitialiser le mot de passe</value></data>
+  <data name="ResetIgnore" xml:space="preserve"><value>Si vous n&apos;avez pas demandé de réinitialisation de mot de passe, ignorez simplement cet e-mail.</value></data>
+</root>

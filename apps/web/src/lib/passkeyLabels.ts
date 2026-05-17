@@ -16,16 +16,19 @@ const AAGUID_NAMES: Record<string, string> = {
   "ee882879-721c-4913-9775-3dfcce97072a": "YubiKey 5",
 };
 
+type Translator = (key: string) => string;
+
 export function getPasskeyLabel(
   aaguid: string | null,
   transports: string[],
   isBackupEligible: boolean,
+  t: Translator,
 ): string {
   if (aaguid && AAGUID_NAMES[aaguid]) return AAGUID_NAMES[aaguid];
-  if (isBackupEligible) return "Синхронизированный ключ";
+  if (isBackupEligible) return t("syncedKey");
   if (transports.some((t) => ["usb", "nfc", "ble", "smart-card"].includes(t)))
-    return "Аппаратный ключ";
-  if (transports.includes("hybrid")) return "Другое устройство";
-  if (transports.includes("internal")) return "Этот браузер";
-  return "Устройство";
+    return t("hardwareKey");
+  if (transports.includes("hybrid")) return t("otherDevice");
+  if (transports.includes("internal")) return t("thisBrowser");
+  return t("device");
 }

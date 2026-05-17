@@ -230,7 +230,7 @@ jobs:
           gcloud compute ssh ${{ secrets.VM_USER }}@mcollector-vm \
             --zone=${{ secrets.VM_ZONE }} \
             --project=${{ secrets.GCP_PROJECT_ID }} \
-            --command="mkdir -p ~/mcollector/infrastructure/docker/prometheus ~/mcollector/infrastructure/docker/grafana/provisioning/datasources"
+            --command="mkdir -p ~/mcollector/infrastructure/docker/prometheus ~/mcollector/infrastructure/docker/grafana/provisioning/datasources ~/mcollector/infrastructure/docker/grafana/provisioning/dashboards"
 
       - name: Copy infrastructure configs to VM
         run: |
@@ -244,6 +244,18 @@ jobs:
             --project=${{ secrets.GCP_PROJECT_ID }}
           gcloud compute scp infrastructure/docker/grafana/provisioning/datasources/prometheus.yml \
             ${{ secrets.VM_USER }}@mcollector-vm:~/mcollector/infrastructure/docker/grafana/provisioning/datasources/prometheus.yml \
+            --zone=${{ secrets.VM_ZONE }} \
+            --project=${{ secrets.GCP_PROJECT_ID }}
+          gcloud compute scp infrastructure/docker/grafana/provisioning/dashboards/dashboards.yml \
+            ${{ secrets.VM_USER }}@mcollector-vm:~/mcollector/infrastructure/docker/grafana/provisioning/dashboards/dashboards.yml \
+            --zone=${{ secrets.VM_ZONE }} \
+            --project=${{ secrets.GCP_PROJECT_ID }}
+          gcloud compute scp infrastructure/docker/grafana/provisioning/dashboards/identity-auth.json \
+            ${{ secrets.VM_USER }}@mcollector-vm:~/mcollector/infrastructure/docker/grafana/provisioning/dashboards/identity-auth.json \
+            --zone=${{ secrets.VM_ZONE }} \
+            --project=${{ secrets.GCP_PROJECT_ID }}
+          gcloud compute scp infrastructure/docker/grafana/provisioning/dashboards/services-overview.json \
+            ${{ secrets.VM_USER }}@mcollector-vm:~/mcollector/infrastructure/docker/grafana/provisioning/dashboards/services-overview.json \
             --zone=${{ secrets.VM_ZONE }} \
             --project=${{ secrets.GCP_PROJECT_ID }}
 

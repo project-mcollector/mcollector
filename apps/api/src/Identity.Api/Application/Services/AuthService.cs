@@ -1,5 +1,6 @@
 using Identity.Api.Domain.Entities;
 using Identity.Api.Infrastructure.Persistence;
+using Identity.Api.Infrastructure.Telemetry;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Text;
@@ -46,7 +47,8 @@ public class AuthService(
     IDateTimeProvider dateTimeProvider,
     IPasskeyService passkeyService,
     ITokenService tokenService,
-    IMailService mailService) : IAuthService
+    IMailService mailService,
+    IdentityMetrics metrics) : IAuthService
 {
     public async Task<Result<AuthTokenDto>> LoginAsync(string email, string password,
         CancellationToken cancellationToken = default)
@@ -56,6 +58,7 @@ public class AuthService(
         {
             if (logger.IsEnabled(LogLevel.Warning))
                 logger.LogWarning("Failed login attempt for {Email}", email);
+            metrics.RecordLogin(IdentityMetrics.Outcomes.UserNotFound);
             return Errors.Unauthorized(email);
         }
 
@@ -63,6 +66,7 @@ public class AuthService(
         {
             if (logger.IsEnabled(LogLevel.Warning))
                 logger.LogWarning("Locked-out login attempt for {UserId}", user.Id);
+            metrics.RecordLogin(IdentityMetrics.Outcomes.LockedOut);
             return Errors.Unauthorized(email);
         }
 
@@ -70,6 +74,7 @@ public class AuthService(
         {
             if (logger.IsEnabled(LogLevel.Warning))
                 logger.LogWarning("Unconfirmed email login attempt for {UserId}", user.Id);
+            metrics.RecordLogin(IdentityMetrics.Outcomes.EmailUnconfirmed);
             return Errors.EmailNotConfirmed();
         }
 
@@ -78,12 +83,14 @@ public class AuthService(
             await userManager.AccessFailedAsync(user);
             if (logger.IsEnabled(LogLevel.Warning))
                 logger.LogWarning("Failed login attempt for {UserId}", user.Id);
+            metrics.RecordLogin(IdentityMetrics.Outcomes.InvalidCredentials);
             return Errors.Unauthorized(email);
         }
 
         await userManager.ResetAccessFailedCountAsync(user);
         if (logger.IsEnabled(LogLevel.Information))
             logger.LogInformation("User {UserId} logged in", user.Id);
+        metrics.RecordLogin(IdentityMetrics.Outcomes.Success);
         return await tokenService.CreateTokenAsync(user, cancellationToken);
     }
 
@@ -98,12 +105,14 @@ public class AuthService(
             var errors = string.Join("; ", result.Errors.Select(e => e.Description));
             if (logger.IsEnabled(LogLevel.Warning))
                 logger.LogWarning("Registration failed for {Email}: {Errors}", email, errors);
+            metrics.RecordRegistration(IdentityMetrics.Outcomes.Failed);
             return Errors.Validation("Registration", errors);
         }
 
         if (logger.IsEnabled(LogLevel.Information))
             logger.LogInformation("User {UserId} registered with email {Email}", user.Id, email);
 
+        metrics.RecordRegistration(IdentityMetrics.Outcomes.Success);
         return await mailService.SendConfirmationEmailAsync(user, locale, cancellationToken);
     }
 
@@ -156,6 +165,11 @@ public class AuthService(
                 if (logger.IsEnabled(LogLevel.Warning))
                     logger.LogWarning("Refresh token reuse detected for user {UserId} — all sessions revoked",
                         stolenUserId);
+                metrics.RecordTokenRefresh(IdentityMetrics.Outcomes.ReuseDetected);
+            }
+            else
+            {
+                metrics.RecordTokenRefresh(IdentityMetrics.Outcomes.Invalid);
             }
 
             return Errors.Unauthorized("Invalid or expired refresh token");
@@ -167,8 +181,12 @@ public class AuthService(
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, now), cancellationToken);
 
         if (revoked == 0)
+        {
+            metrics.RecordTokenRefresh(IdentityMetrics.Outcomes.Invalid);
             return Errors.Unauthorized("Invalid or expired refresh token");
+        }
 
+        metrics.RecordTokenRefresh(IdentityMetrics.Outcomes.Success);
         return await tokenService.CreateTokenAsync(token.User, cancellationToken);
     }
 
@@ -207,9 +225,14 @@ public class AuthService(
 
         var result = await mailService.ConfirmEmail(user, emailToken, cancellationToken);
 
-        return result.IsSuccess
-            ? await tokenService.CreateTokenAsync(user, cancellationToken)
-            : Errors.Validation("Email Confirmation", result.Error.Description);
+        if (!result.IsSuccess)
+        {
+            metrics.RecordEmailConfirmation(IdentityMetrics.Outcomes.Failed);
+            return Errors.Validation("Email Confirmation", result.Error.Description);
+        }
+
+        metrics.RecordEmailConfirmation(IdentityMetrics.Outcomes.Success);
+        return await tokenService.CreateTokenAsync(user, cancellationToken);
     }
 
     public async Task<Result> ResendConfirmationEmailAsync(string email, string? locale = null, CancellationToken cancellationToken = default)
@@ -246,7 +269,10 @@ public class AuthService(
         var result = await userManager.ResetPasswordAsync(user, decodedToken.Value, password);
 
         if (!result.Succeeded)
+        {
+            metrics.RecordPasswordReset(IdentityMetrics.Outcomes.Failed);
             return Errors.Validation("ResetPassword", string.Join("; ", result.Errors.Select(e => e.Description)));
+        }
 
         await dbContext.RefreshTokens
             .Where(t => t.UserId == userId && t.RevokedAt == null)
@@ -255,6 +281,7 @@ public class AuthService(
         if (logger.IsEnabled(LogLevel.Information))
             logger.LogInformation("User {UserId} reset their password", userId);
 
+        metrics.RecordPasswordReset(IdentityMetrics.Outcomes.Success);
         return Result.Success();
     }
 

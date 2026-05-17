@@ -1,5 +1,6 @@
 using System.Text;
 using Identity.Api.Domain.Entities;
+using Identity.Api.Infrastructure.Telemetry;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.AspNetCore.Identity;
 using Utilities;
@@ -41,7 +42,8 @@ public sealed class PasskeyService(
     UserManager<ApplicationUser> userManager,
     SignInManager<ApplicationUser> signInManager,
     ITokenService tokenService,
-    ILogger<PasskeyService>? logger = null)
+    ILogger<PasskeyService>? logger = null,
+    IdentityMetrics? metrics = null)
     : IPasskeyService
 {
     private const int MaxPasskeysPerUser = 5;
@@ -102,7 +104,10 @@ public sealed class PasskeyService(
         CancellationToken cancellationToken = default)
     {
         if (await HasReachedPasskeyLimitAsync(user))
+        {
+            metrics?.RecordPasskeyRegistration(IdentityMetrics.Outcomes.LimitReached);
             return Errors.Conflict($"Passkey limit reached ({MaxPasskeysPerUser}) for this account");
+        }
 
         var attestation = await signInManager.PerformPasskeyAttestationAsync(credentialJson);
         if (!attestation.Succeeded)
@@ -111,9 +116,11 @@ public sealed class PasskeyService(
                 "Passkey attestation failed for user {UserId}: {Failure}",
                 user.Id,
                 attestation.Failure?.Message ?? "unknown failure");
+            metrics?.RecordPasskeyRegistration(IdentityMetrics.Outcomes.AttestationFailed);
             return Errors.Validation("Passkey", attestation.Failure?.Message ?? "Registration failed");
         }
         await userManager.AddOrUpdatePasskeyAsync(user, attestation.Passkey);
+        metrics?.RecordPasskeyRegistration(IdentityMetrics.Outcomes.Success);
         return Result.Success();
     }
 
@@ -138,9 +145,11 @@ public sealed class PasskeyService(
         if (!result.Succeeded)
         {
             logger?.LogWarning("Passkey assertion failed: {Failure}", result.Failure?.Message ?? "unknown failure");
+            metrics?.RecordPasskeyLogin(IdentityMetrics.Outcomes.AssertionFailed);
             return Errors.Unauthorized("passkey");
         }
 
+        metrics?.RecordPasskeyLogin(IdentityMetrics.Outcomes.Success);
         return await tokenService.CreateTokenAsync(result.User, cancellationToken);
     }
 

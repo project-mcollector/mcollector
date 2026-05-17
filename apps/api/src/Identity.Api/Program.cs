@@ -3,6 +3,7 @@ using Identity.Api.Application.Services;
 using Identity.Api.Domain.Entities;
 using Identity.Api.Infrastructure.HealthChecks;
 using Identity.Api.Infrastructure.Persistence;
+using Identity.Api.Infrastructure.Telemetry;
 using Infrastructure.Auth;
 using Infrastructure.Observability;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -82,6 +83,7 @@ builder.Services.Configure<IdentityPasskeyOptions>(options =>
 });
 
 builder.Services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
+builder.Services.AddSingleton<IdentityMetrics>();
 builder.Services.AddScoped<IMailService, MailService>();
 builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
 builder.Services.AddScoped<IAuthService, AuthService>();

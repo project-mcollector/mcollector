@@ -13,7 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       api: ${{ steps.filter.outputs.api }}
-      js: ${{ steps.filter.outputs.js }}
+      web: ${{ steps.filter.outputs.web }}
+      packages: ${{ steps.filter.outputs.packages }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -22,8 +23,12 @@ jobs:
           filters: |
             api:
               - 'apps/api/**'
-            js:
+            web:
               - 'apps/web/**'
+              - 'pnpm-lock.yaml'
+              - 'turbo.json'
+              - 'package.json'
+            packages:
               - 'packages/**'
               - 'pnpm-lock.yaml'
               - 'turbo.json'
@@ -33,7 +38,7 @@ jobs:
 
   lint-api:
     needs: [changes]
-    if: github.event_name == 'push' || needs.changes.outputs.api == 'true'
+    if: needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -50,7 +55,7 @@ jobs:
 
   check-js:
     needs: [changes]
-    if: github.event_name == 'push' || needs.changes.outputs.js == 'true'
+    if: needs.changes.outputs.web == 'true' || needs.changes.outputs.packages == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -66,16 +71,11 @@ jobs:
           restore-keys: turbo-${{ runner.os }}-
       - run: pnpm install --frozen-lockfile
       - name: Build, lint, typecheck, test
-        env:
-          RESEND_APITOKEN: ${{ secrets.RESEND_APITOKEN }}
-          RESEND_WEBHOOK_SECRET: ${{ secrets.RESEND_WEBHOOK_SECRET }}
-          RESEND_FORWARD_TO: ${{ secrets.RESEND_FORWARD_TO }}
-          RESEND_FORWARD_FROM: ${{ secrets.RESEND_FORWARD_FROM }}
         run: pnpm turbo run build lint typecheck test
 
   test-api:
     needs: [changes]
-    if: github.event_name == 'push' || needs.changes.outputs.api == 'true'
+    if: needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -93,9 +93,10 @@ jobs:
   # ── Publish SDK (main only) ──────────────────────────────────────────────────
 
   publish-sdk:
-    needs: [lint-api, check-js, test-api]
+    needs: [changes, lint-api, check-js, test-api]
     if: |
       github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.packages == 'true' &&
       (needs.lint-api.result == 'success' || needs.lint-api.result == 'skipped') &&
       (needs.check-js.result == 'success' || needs.check-js.result == 'skipped') &&
       (needs.test-api.result == 'success' || needs.test-api.result == 'skipped')
@@ -121,7 +122,7 @@ jobs:
         run: |
           VERSION=$(node -p "require('./packages/sdk/package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          if npm view @mcollector/sdk@$VERSION version 2>/dev/null | grep -q "$VERSION"; then
+          if npm view @mcollector/sdk@$VERSION version &>/dev/null; then
             echo "skip=true" >> $GITHUB_OUTPUT
           else
             echo "skip=false" >> $GITHUB_OUTPUT
@@ -135,14 +136,15 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   # ── Docker builds (main only, API services run in parallel via matrix) ───────
-  # Deploy uses IMAGE_TAG=${{ github.sha }} for all services, so all images must
-  # be rebuilt on every main push regardless of what changed. The GHA layer cache
-  # makes rebuilds fast when source is unchanged.
+  # Skipped when only packages/** changed (SDK-only push) — nothing to deploy.
+  # Both images are always rebuilt together so IMAGE_TAG=${{ github.sha }} is
+  # consistent across all services in the deploy step.
 
   build-and-push-api:
-    needs: [lint-api, check-js, test-api]
+    needs: [changes, lint-api, check-js, test-api]
     if: |
       github.ref == 'refs/heads/main' &&
+      (needs.changes.outputs.api == 'true' || needs.changes.outputs.web == 'true') &&
       (needs.lint-api.result == 'success' || needs.lint-api.result == 'skipped') &&
       (needs.check-js.result == 'success' || needs.check-js.result == 'skipped') &&
       (needs.test-api.result == 'success' || needs.test-api.result == 'skipped')
@@ -177,9 +179,10 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.service.name }}
 
   build-and-push-web:
-    needs: [lint-api, check-js, test-api]
+    needs: [changes, lint-api, check-js, test-api]
     if: |
       github.ref == 'refs/heads/main' &&
+      (needs.changes.outputs.api == 'true' || needs.changes.outputs.web == 'true') &&
       (needs.lint-api.result == 'success' || needs.lint-api.result == 'skipped') &&
       (needs.check-js.result == 'success' || needs.check-js.result == 'skipped') &&
       (needs.test-api.result == 'success' || needs.test-api.result == 'skipped')
@@ -215,6 +218,10 @@ jobs:
 
   deploy:
     needs: [build-and-push-api, build-and-push-web]
+    if: |
+      github.ref == 'refs/heads/main' &&
+      needs.build-and-push-api.result == 'success' &&
+      needs.build-and-push-web.result == 'success'
     runs-on: ubuntu-latest
     env:
       REGISTRY: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/mcollector

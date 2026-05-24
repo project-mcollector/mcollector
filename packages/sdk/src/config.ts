@@ -1,7 +1,7 @@
 /** Default configuration options for the Analytics SDK. */
 import { InitOptions } from './types/Options';
 
-export const defaultOptions: Required<InitOptions> = {
+export const defaultOptions: Required<Omit<InitOptions, 'projectId'>> = {
   apiHost: 'https://api.yourdomain.com/ingest', 
   debug: false,
   autoTrackPages: true,

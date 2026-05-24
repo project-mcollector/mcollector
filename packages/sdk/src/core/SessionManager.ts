@@ -1,9 +1,9 @@
 /** Handles user session lifecycle, timeouts, and session ID generation. */
-import { Storage } from './Storage';
+import { Storage } from "./Storage";
 
-const SESSION_ID_KEY = '_mc_sid';
-const LAST_ACTIVE_KEY = '_mc_last_active';
-const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000; 
+const SESSION_ID_KEY = "_mc_sid";
+const LAST_ACTIVE_KEY = "_mc_last_active";
+const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000;
 
 export class SessionManager {
   private storage: Storage;
@@ -17,11 +17,11 @@ export class SessionManager {
   public getSessionId(): string {
     let sessionId = this.storage.get(SESSION_ID_KEY);
     const lastActiveStr = this.storage.get(LAST_ACTIVE_KEY);
-    
+
     const now = Date.now();
     const lastActive = lastActiveStr ? parseInt(lastActiveStr, 10) : 0;
 
-    if (!sessionId || (now - lastActive > this.sessionTimeout)) {
+    if (!sessionId || now - lastActive > this.sessionTimeout) {
       sessionId = this.generateUUID();
       this.storage.set(SESSION_ID_KEY, sessionId, 1);
     }
@@ -41,13 +41,12 @@ export class SessionManager {
   }
 
   private generateUUID(): string {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-      return crypto.randomUUID();
+    if (typeof crypto === "undefined") {
+      throw new Error(
+        "Crypto API unavailable, cannot generate secure session ID",
+      );
     }
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-      const r = (Math.random() * 16) | 0,
-        v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
+
+    return crypto.randomUUID();
   }
 }

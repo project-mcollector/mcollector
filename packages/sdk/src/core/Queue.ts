@@ -190,7 +190,7 @@ export class Queue {
   }
 
   private normalizeApiHost(rawHost: string): string {
-    const trimmedHost = rawHost.trim().replace(/\/+$/, "");
+    const trimmedHost = this.trimTrailingSlashes(rawHost.trim());
 
     try {
       const url = new URL(trimmedHost);
@@ -205,5 +205,11 @@ export class Queue {
         ? trimmedHost
         : `${trimmedHost}/api/v1/ingest`;
     }
+  }
+
+  private trimTrailingSlashes(s: string): string {
+    let end = s.length;
+    while (end > 0 && s[end - 1] === "/") end--;
+    return s.slice(0, end);
   }
 }

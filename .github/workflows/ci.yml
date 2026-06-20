@@ -95,12 +95,16 @@ jobs:
   publish-sdk:
     needs: [changes, lint-api, check-js, test-api]
     if: |
+      always() &&
       github.ref == 'refs/heads/main' &&
       needs.changes.outputs.packages == 'true' &&
       (needs.lint-api.result == 'success' || needs.lint-api.result == 'skipped') &&
       (needs.check-js.result == 'success' || needs.check-js.result == 'skipped') &&
       (needs.test-api.result == 'success' || needs.test-api.result == 'skipped')
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -127,13 +131,9 @@ jobs:
           else
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Publish SDK
         if: steps.version_check.outputs.skip == 'false'
-        run: pnpm --filter @mcollector/sdk publish --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: pnpm --filter @mcollector/sdk publish --access public --no-git-checks --provenance
 
   # ── Docker builds (main only, API services run in parallel via matrix) ───────
   # Skipped when only packages/** changed (SDK-only push) — nothing to deploy.

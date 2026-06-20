@@ -13,24 +13,31 @@ pnpm add @mcollector/sdk
 ```ts
 import { analytics, logger } from "@mcollector/sdk";
 
+// Initialize once at app startup
 analytics.init("your-api-key", {
   apiHost: "http://35.228.4.134:5001/api/v1/ingest",
   debug: true,
 });
 
-analytics.track("button_clicked", {
-  label: "Create Project",
-});
+// Track events
+analytics.track("button_clicked", { label: "Create Project" });
 
+// Identify a user
 analytics.identify("user_123", {
   email: "user@example.com",
   plan: "pro",
 });
 
-analytics.page("Dashboard", "Projects");
-logger.info("dashboard_opened", {
-  section: "Projects",
-});
+// Structured logging — forwarded as analytics events
+logger.info("dashboard_opened", { section: "Projects" });
+logger.warn("rate_limit_approaching", { remaining: 10 });
+
+try {
+  await submitForm();
+} catch (err) {
+  logger.error(err, { formId: "onboarding" }); // Error is serialized automatically
+}
+
 await analytics.flush();
 ```
 

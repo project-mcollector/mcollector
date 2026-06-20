@@ -95,6 +95,7 @@ jobs:
   publish-sdk:
     needs: [changes, lint-api, check-js, test-api]
     if: |
+      always() &&
       github.ref == 'refs/heads/main' &&
       needs.changes.outputs.packages == 'true' &&
       (needs.lint-api.result == 'success' || needs.lint-api.result == 'skipped') &&
@@ -103,6 +104,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -122,6 +125,14 @@ jobs:
         run: |
           VERSION=$(node -p "require('./packages/sdk/package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          PREV=$(git show HEAD^:packages/sdk/package.json 2>/dev/null \
+            | node -e "let d=''; process.stdin.on('data',c=>d+=c).on('end',()=>{try{console.log(JSON.parse(d).version??'')}catch{console.log('')}})")
+          if [ -n "$PREV" ] && [ "$PREV" = "$VERSION" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
           if npm view @mcollector/sdk@$VERSION version &>/dev/null; then
             echo "skip=true" >> $GITHUB_OUTPUT
           else
@@ -131,7 +142,8 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Publish SDK
         if: steps.version_check.outputs.skip == 'false'
-        run: pnpm --filter @mcollector/sdk publish --access public --no-git-checks
+        working-directory: packages/sdk
+        run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 

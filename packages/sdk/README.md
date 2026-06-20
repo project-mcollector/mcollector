@@ -11,7 +11,7 @@ pnpm add @mcollector/sdk
 ## Quick Start
 
 ```ts
-import { analytics } from "@mcollector/sdk";
+import { analytics, logger } from "@mcollector/sdk";
 
 analytics.init("your-api-key", {
   apiHost: "http://35.228.4.134:5001/api/v1/ingest",
@@ -28,6 +28,9 @@ analytics.identify("user_123", {
 });
 
 analytics.page("Dashboard", "Projects");
+logger.info("dashboard_opened", {
+  section: "Projects",
+});
 await analytics.flush();
 ```
 
@@ -59,6 +62,10 @@ Associates events with a known user and stores the user ID and traits locally
 ### `page(name?, category?, properties?)`
 
 Tracks a page view event. The SDK records the current URL, path, search string, and document title when it runs in the browser
+
+### `logger.info|warn|error|debug|trace|fatal(message, metadata?)`
+
+Sends a structured log event through the analytics queue. The event name is the method name, for example `logger.warn(...)` sends a `warn` event. Metadata is merged into event properties alongside `level` and `message`. Passing an `Error` serializes its `name`, `message`, `stack`, and `cause` into the `error` property.
 
 ### `reset()`
 

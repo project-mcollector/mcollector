@@ -53,6 +53,7 @@ Options:
   Default: `http://35.228.4.134:5001/api/v1/ingest`
 - `debug`: Logs queueing and flush activity to the console
 - `autoTrackPages`: Enables automatic page tracking. Default: `true`
+- `autoTrackErrors`: Enables automatic collection of uncaught errors, resource load errors, and unhandled promise rejections. Default: `true`
 - `batchSize`: Number of events to queue before flushing. Default: `10`
 - `flushInterval`: Time in milliseconds before a queued batch is flushed. Default: `3000`
 - `cookieDomain`: Cookie domain used for identity/session storage
@@ -101,6 +102,7 @@ Every event includes common context such as:
 
 - The SDK is designed for browser usage
 - `autoTrackPages` listens to `popstate`, `history.pushState`, and `history.replaceState` so SPA route changes are tracked automatically
+- `autoTrackErrors` listens to `window.onerror`, `error`, and `unhandledrejection`, sending `$exception` events
 - Identity, anonymous ID, traits, queue state, and session state are persisted through cookies and localStorage when available
 - Events are batched and sent to `${apiHost}/events`
 

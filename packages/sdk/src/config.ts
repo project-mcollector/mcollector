@@ -5,6 +5,7 @@ export const defaultOptions: Required<Omit<InitOptions, 'projectId'>> = {
   apiHost: 'https://api.yourdomain.com/ingest', 
   debug: false,
   autoTrackPages: true,
+  autoTrackErrors: true,
   batchSize: 10,          
   flushInterval: 3000,     
   cookieDomain: '',

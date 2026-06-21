@@ -4,6 +4,7 @@ export interface InitOptions {
   apiHost?: string;
   debug?: boolean;
   autoTrackPages?: boolean;
+  autoTrackErrors?: boolean;
   batchSize?: number;
   flushInterval?: number;
   cookieDomain?: string;

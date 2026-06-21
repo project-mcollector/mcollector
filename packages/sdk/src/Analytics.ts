@@ -4,6 +4,7 @@ import { Storage } from './core/Storage';
 import { Queue } from './core/Queue';
 import { SessionManager } from './core/SessionManager';
 import { EventBuilder } from './core/EventBuilder';
+import { ErrorCollector } from './core/ErrorCollector';
 import { defaultOptions } from './config';
 
 export class Analytics {
@@ -13,6 +14,7 @@ export class Analytics {
   private queue!: Queue;
   private sessionManager!: SessionManager;
   private builder!: EventBuilder;
+  private errorCollector?: ErrorCollector;
   private initialized = false;
 
   public init(writeKey: string, options: InitOptions = {}) {
@@ -34,6 +36,11 @@ export class Analytics {
 
     if (this.options.autoTrackPages) {
       this.setupAutoPageTracking();
+    }
+
+    if (this.options.autoTrackErrors) {
+      this.errorCollector = new ErrorCollector(this);
+      this.errorCollector.start();
     }
   }
 

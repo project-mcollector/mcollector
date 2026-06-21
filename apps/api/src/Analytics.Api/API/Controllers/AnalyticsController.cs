@@ -41,7 +41,16 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
         var uniqueUsers = await query.Select(e => e.UserId).Distinct().CountAsync(cancellationToken);
         var pageViews = await query.Where(e => e.EventName == "$pageview").CountAsync(cancellationToken);
 
-        return Ok(new { totalEvents, uniqueUsers, pageViews });
+        var fromDate = from ?? DateTimeOffset.UtcNow.AddDays(-7);
+        var toDate = to ?? DateTimeOffset.UtcNow;
+        var totalHours = Math.Max(1, (int)Math.Ceiling((toDate - fromDate).TotalHours));
+        var activeHours = await query
+            .Select(e => new { e.Timestamp.Date, Hour = e.Timestamp.Hour })
+            .Distinct()
+            .CountAsync(cancellationToken);
+        var uptime = Math.Round(Math.Min(100.0, (double)activeHours / totalHours * 100), 1);
+
+        return Ok(new { totalEvents, uniqueUsers, pageViews, uptime });
     }
 
     [HttpGet("events")]

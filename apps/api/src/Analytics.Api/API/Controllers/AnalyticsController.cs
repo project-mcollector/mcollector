@@ -233,6 +233,64 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
         return Ok(timeseries);
     }
 
+    private static readonly HashSet<string> LogLevels =
+        ["trace", "debug", "info", "warn", "error", "fatal"];
+
+    [HttpGet("logs")]
+    public async Task<IActionResult> GetLogs(
+        Guid projectId,
+        [FromQuery] DateTimeOffset? from,
+        [FromQuery] DateTimeOffset? to,
+        [FromQuery] string? level,
+        [FromQuery] string? search,
+        [FromQuery] int limit = 100,
+        [FromQuery] int offset = 0,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await IsProjectMemberAsync(projectId, cancellationToken)) return Forbid();
+
+        var query = dbContext.ProcessedEvents
+            .AsNoTracking()
+            .Where(e => e.ProjectId == projectId && LogLevels.Contains(e.EventName));
+
+        if (from.HasValue) query = query.Where(e => e.Timestamp >= from.Value);
+        if (to.HasValue) query = query.Where(e => e.Timestamp <= to.Value);
+
+        if (!string.IsNullOrEmpty(level) && LogLevels.Contains(level))
+            query = query.Where(e => e.EventName == level);
+
+        if (!string.IsNullOrEmpty(search))
+            query = query.Where(e => e.PropertiesJson != null &&
+                EF.Functions.ILike(e.PropertiesJson, $"%{search}%"));
+
+        var total = await query.CountAsync(cancellationToken);
+
+        var raw = await query
+            .OrderByDescending(e => e.Timestamp)
+            .Skip(offset)
+            .Take(Math.Min(limit, 500))
+            .Select(e => new { e.Timestamp, e.EventName, e.PropertiesJson })
+            .ToListAsync(cancellationToken);
+
+        var logs = raw.Select(e =>
+        {
+            string? message = null;
+            if (!string.IsNullOrWhiteSpace(e.PropertiesJson))
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(e.PropertiesJson);
+                    if (doc.RootElement.TryGetProperty("message", out var msgProp))
+                        message = msgProp.GetString();
+                }
+                catch (JsonException) { }
+            }
+            return new { timestamp = e.Timestamp, level = e.EventName, message = message ?? string.Empty };
+        });
+
+        return Ok(new { total, logs });
+    }
+
     private static bool IsValidInterval(string interval) =>
         interval.ToLower() is "hour" or "day" or "month";
 }

@@ -51,7 +51,7 @@ services:
     restart: "no"
 
   ingestion:
-    image: ${REGISTRY}/ingestion:${IMAGE_TAG:-latest}
+    image: ${REGISTRY}/ingestion:${API_IMAGE_TAG:-latest}
     restart: unless-stopped
     ports:
       - "5001:8080"
@@ -71,7 +71,7 @@ services:
       start_period: 30s
 
   analytics:
-    image: ${REGISTRY}/analytics:${IMAGE_TAG:-latest}
+    image: ${REGISTRY}/analytics:${API_IMAGE_TAG:-latest}
     restart: unless-stopped
     ports:
       - "5002:8080"
@@ -90,7 +90,7 @@ services:
       start_period: 30s
 
   identity:
-    image: ${REGISTRY}/identity:${IMAGE_TAG:-latest}
+    image: ${REGISTRY}/identity:${API_IMAGE_TAG:-latest}
     restart: unless-stopped
     ports:
       - "5003:8080"
@@ -112,7 +112,7 @@ services:
       start_period: 30s
 
   processor:
-    image: ${REGISTRY}/processor:${IMAGE_TAG:-latest}
+    image: ${REGISTRY}/processor:${API_IMAGE_TAG:-latest}
     restart: unless-stopped
     depends_on:
       kafka-init:
@@ -124,7 +124,7 @@ services:
       - Kafka__BootstrapServers=kafka:29092
 
   web:
-    image: ${REGISTRY}/web:${IMAGE_TAG:-latest}
+    image: ${REGISTRY}/web:${WEB_IMAGE_TAG:-latest}
     restart: unless-stopped
     ports:
       - "3000:3000"

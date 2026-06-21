@@ -93,14 +93,12 @@ jobs:
   # ── Publish SDK (main only) ──────────────────────────────────────────────────
 
   publish-sdk:
-    needs: [changes, lint-api, check-js, test-api]
+    needs: [changes, check-js]
     if: |
       always() &&
       github.ref == 'refs/heads/main' &&
       needs.changes.outputs.packages == 'true' &&
-      (needs.lint-api.result == 'success' || needs.lint-api.result == 'skipped') &&
-      (needs.check-js.result == 'success' || needs.check-js.result == 'skipped') &&
-      (needs.test-api.result == 'success' || needs.test-api.result == 'skipped')
+      (needs.check-js.result == 'success' || needs.check-js.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -153,12 +151,12 @@ jobs:
   # consistent across all services in the deploy step.
 
   build-and-push-api:
-    needs: [changes, lint-api, check-js, test-api]
+    needs: [changes, lint-api, test-api]
     if: |
+      always() &&
       github.ref == 'refs/heads/main' &&
-      (needs.changes.outputs.api == 'true' || needs.changes.outputs.web == 'true') &&
+      needs.changes.outputs.api == 'true' &&
       (needs.lint-api.result == 'success' || needs.lint-api.result == 'skipped') &&
-      (needs.check-js.result == 'success' || needs.check-js.result == 'skipped') &&
       (needs.test-api.result == 'success' || needs.test-api.result == 'skipped')
     runs-on: ubuntu-latest
     strategy:
@@ -191,13 +189,12 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.service.name }}
 
   build-and-push-web:
-    needs: [changes, lint-api, check-js, test-api]
+    needs: [changes, check-js]
     if: |
+      always() &&
       github.ref == 'refs/heads/main' &&
-      (needs.changes.outputs.api == 'true' || needs.changes.outputs.web == 'true') &&
-      (needs.lint-api.result == 'success' || needs.lint-api.result == 'skipped') &&
-      (needs.check-js.result == 'success' || needs.check-js.result == 'skipped') &&
-      (needs.test-api.result == 'success' || needs.test-api.result == 'skipped')
+      needs.changes.outputs.web == 'true' &&
+      (needs.check-js.result == 'success' || needs.check-js.result == 'skipped')
     runs-on: ubuntu-latest
     env:
       REGISTRY: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/mcollector
@@ -227,13 +224,16 @@ jobs:
           cache-to: type=gha,mode=max,scope=web
 
   # ── Deploy ───────────────────────────────────────────────────────────────────
+  # Two independent jobs so an API-only push deploys only API services and a
+  # web-only push deploys only the web container. They can run in parallel when
+  # both changed in the same commit.
 
-  deploy:
-    needs: [build-and-push-api, build-and-push-web]
+  deploy-api:
+    needs: [build-and-push-api]
     if: |
+      always() &&
       github.ref == 'refs/heads/main' &&
-      needs.build-and-push-api.result == 'success' &&
-      needs.build-and-push-web.result == 'success'
+      needs.build-and-push-api.result == 'success'
     runs-on: ubuntu-latest
     env:
       REGISTRY: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/mcollector
@@ -278,7 +278,7 @@ jobs:
             --zone=${{ secrets.VM_ZONE }} \
             --project=${{ secrets.GCP_PROJECT_ID }}
 
-      - name: Deploy
+      - name: Deploy API services
         env:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           PASSKEY_SERVER_DOMAIN: ${{ secrets.PASSKEY_SERVER_DOMAIN }}
@@ -293,7 +293,8 @@ jobs:
         run: |
           {
             echo "REGISTRY=${{ env.REGISTRY }}"
-            echo "IMAGE_TAG=${{ github.sha }}"
+            echo "API_IMAGE_TAG=${{ github.sha }}"
+            echo "WEB_IMAGE_TAG=latest"
             echo "JWT_SECRET=${JWT_SECRET}"
             echo "PASSKEY_SERVER_DOMAIN=${PASSKEY_SERVER_DOMAIN}"
             echo "ALLOWED_ORIGIN=${ALLOWED_ORIGIN}"
@@ -307,7 +308,7 @@ jobs:
           } > /tmp/deploy.env
 
           gcloud compute scp /tmp/deploy.env \
-            ${{ secrets.VM_USER }}@mcollector-vm:~/.deploy.env \
+            ${{ secrets.VM_USER }}@mcollector-vm:/tmp/deploy.env \
             --zone=${{ secrets.VM_ZONE }} \
             --project=${{ secrets.GCP_PROJECT_ID }}
 
@@ -315,26 +316,112 @@ jobs:
             --zone=${{ secrets.VM_ZONE }} \
             --project=${{ secrets.GCP_PROJECT_ID }} \
             --command="
-              trap 'rm -f ~/.deploy.env' EXIT
+              trap 'rm -f /tmp/deploy.env' EXIT
               gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev --quiet &&
               sudo mkdir -p /root/.docker &&
               sudo cp ~/.docker/config.json /root/.docker/config.json &&
               cd ~/mcollector &&
-              sudo docker compose -f infrastructure/docker/docker-compose.prod.yml --env-file ~/.deploy.env pull &&
-              sudo docker compose -f infrastructure/docker/docker-compose.prod.yml --env-file ~/.deploy.env up -d --remove-orphans &&
+              sudo docker compose -f infrastructure/docker/docker-compose.prod.yml --env-file /tmp/deploy.env pull ingestion analytics identity processor &&
+              sudo docker compose -f infrastructure/docker/docker-compose.prod.yml --env-file /tmp/deploy.env up -d ingestion analytics identity processor &&
               sudo docker image prune -a -f
             "
 
-      - name: Verify deployment
+      - name: Verify API deployment
         run: |
           gcloud compute ssh ${{ secrets.VM_USER }}@mcollector-vm \
             --zone=${{ secrets.VM_ZONE }} \
             --project=${{ secrets.GCP_PROJECT_ID }} \
             --command="
               sleep 10 &&
-              EXITED=\$(sudo docker compose -f ~/mcollector/infrastructure/docker/docker-compose.prod.yml ps --status exited --quiet | wc -l) &&
+              EXITED=\$(sudo docker compose -f ~/mcollector/infrastructure/docker/docker-compose.prod.yml ps ingestion analytics identity processor --status exited --quiet | wc -l) &&
               [ \"\$EXITED\" -eq 0 ] || {
-                echo \"ERROR: \$EXITED container(s) exited after deploy\"
+                echo \"ERROR: \$EXITED API container(s) exited after deploy\"
+                sudo docker compose -f ~/mcollector/infrastructure/docker/docker-compose.prod.yml ps
+                exit 1
+              }
+            "
+
+  deploy-web:
+    needs: [build-and-push-web]
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      needs.build-and-push-web.result == 'success'
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/mcollector
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Copy docker-compose to VM
+        run: |
+          gcloud compute scp infrastructure/docker/docker-compose.prod.yml \
+            ${{ secrets.VM_USER }}@mcollector-vm:~/mcollector/infrastructure/docker/docker-compose.prod.yml \
+            --zone=${{ secrets.VM_ZONE }} \
+            --project=${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Deploy web
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          PASSKEY_SERVER_DOMAIN: ${{ secrets.PASSKEY_SERVER_DOMAIN }}
+          ALLOWED_ORIGIN: ${{ secrets.ALLOWED_ORIGIN }}
+          DB_CONNECTION_STRING: ${{ secrets.DB_CONNECTION_STRING }}
+          RESEND_APITOKEN: ${{ secrets.RESEND_APITOKEN }}
+          RESEND_WEBHOOK_SECRET: ${{ secrets.RESEND_WEBHOOK_SECRET }}
+          RESEND_FORWARD_TO: ${{ secrets.RESEND_FORWARD_TO }}
+          RESEND_FORWARD_FROM: ${{ secrets.RESEND_FORWARD_FROM }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+        run: |
+          {
+            echo "REGISTRY=${{ env.REGISTRY }}"
+            echo "API_IMAGE_TAG=latest"
+            echo "WEB_IMAGE_TAG=${{ github.sha }}"
+            echo "JWT_SECRET=${JWT_SECRET}"
+            echo "PASSKEY_SERVER_DOMAIN=${PASSKEY_SERVER_DOMAIN}"
+            echo "ALLOWED_ORIGIN=${ALLOWED_ORIGIN}"
+            echo "DB_CONNECTION_STRING=${DB_CONNECTION_STRING}"
+            echo "RESEND_APITOKEN=${RESEND_APITOKEN}"
+            echo "RESEND_WEBHOOK_SECRET=${RESEND_WEBHOOK_SECRET}"
+            echo "RESEND_FORWARD_TO=${RESEND_FORWARD_TO}"
+            echo "RESEND_FORWARD_FROM=${RESEND_FORWARD_FROM}"
+            echo "FRONTEND_URL=${FRONTEND_URL}"
+            echo "GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}"
+          } > /tmp/deploy.env
+
+          gcloud compute scp /tmp/deploy.env \
+            ${{ secrets.VM_USER }}@mcollector-vm:/tmp/deploy.env \
+            --zone=${{ secrets.VM_ZONE }} \
+            --project=${{ secrets.GCP_PROJECT_ID }}
+
+          gcloud compute ssh ${{ secrets.VM_USER }}@mcollector-vm \
+            --zone=${{ secrets.VM_ZONE }} \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
+            --command="
+              trap 'rm -f /tmp/deploy.env' EXIT
+              gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev --quiet &&
+              sudo mkdir -p /root/.docker &&
+              sudo cp ~/.docker/config.json /root/.docker/config.json &&
+              cd ~/mcollector &&
+              sudo docker compose -f infrastructure/docker/docker-compose.prod.yml --env-file /tmp/deploy.env pull web &&
+              sudo docker compose -f infrastructure/docker/docker-compose.prod.yml --env-file /tmp/deploy.env up -d web &&
+              sudo docker image prune -a -f
+            "
+
+      - name: Verify web deployment
+        run: |
+          gcloud compute ssh ${{ secrets.VM_USER }}@mcollector-vm \
+            --zone=${{ secrets.VM_ZONE }} \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
+            --command="
+              sleep 10 &&
+              EXITED=\$(sudo docker compose -f ~/mcollector/infrastructure/docker/docker-compose.prod.yml ps web --status exited --quiet | wc -l) &&
+              [ \"\$EXITED\" -eq 0 ] || {
+                echo \"ERROR: web container exited after deploy\"
                 sudo docker compose -f ~/mcollector/infrastructure/docker/docker-compose.prod.yml ps
                 exit 1
               }

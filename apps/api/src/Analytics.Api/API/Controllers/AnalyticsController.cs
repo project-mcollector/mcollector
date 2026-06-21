@@ -259,9 +259,29 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
         if (!string.IsNullOrEmpty(level) && LogLevels.Contains(level))
             query = query.Where(e => e.EventName == level);
 
+        // PropertiesJson is jsonb — no ILIKE operator exists for jsonb in PostgreSQL.
+        // When searching, fetch rows already narrowed by date/level, then filter in memory.
         if (!string.IsNullOrEmpty(search))
-            query = query.Where(e => e.PropertiesJson != null &&
-                EF.Functions.ILike(e.PropertiesJson, $"%{search}%"));
+        {
+            var allRaw = await query
+                .OrderByDescending(e => e.Timestamp)
+                .Select(e => new { e.Timestamp, e.EventName, e.PropertiesJson })
+                .ToListAsync(cancellationToken);
+
+            var filtered = allRaw
+                .Where(e => e.PropertiesJson != null &&
+                    e.PropertiesJson.Contains(search, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            return Ok(new
+            {
+                total = filtered.Count,
+                logs = filtered
+                    .Skip(offset)
+                    .Take(Math.Min(limit, 500))
+                    .Select(e => ExtractLogEntry(e.Timestamp, e.EventName, e.PropertiesJson))
+            });
+        }
 
         var total = await query.CountAsync(cancellationToken);
 
@@ -272,23 +292,23 @@ public class AnalyticsController(AnalyticsDbContext dbContext) : ControllerBase
             .Select(e => new { e.Timestamp, e.EventName, e.PropertiesJson })
             .ToListAsync(cancellationToken);
 
-        var logs = raw.Select(e =>
-        {
-            string? message = null;
-            if (!string.IsNullOrWhiteSpace(e.PropertiesJson))
-            {
-                try
-                {
-                    using var doc = JsonDocument.Parse(e.PropertiesJson);
-                    if (doc.RootElement.TryGetProperty("message", out var msgProp))
-                        message = msgProp.GetString();
-                }
-                catch (JsonException) { }
-            }
-            return new { timestamp = e.Timestamp, level = e.EventName, message = message ?? string.Empty };
-        });
+        return Ok(new { total, logs = raw.Select(e => ExtractLogEntry(e.Timestamp, e.EventName, e.PropertiesJson)) });
+    }
 
-        return Ok(new { total, logs });
+    private static object ExtractLogEntry(DateTimeOffset timestamp, string eventName, string? propertiesJson)
+    {
+        string? message = null;
+        if (!string.IsNullOrWhiteSpace(propertiesJson))
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(propertiesJson);
+                if (doc.RootElement.TryGetProperty("message", out var msgProp))
+                    message = msgProp.GetString();
+            }
+            catch (JsonException) { }
+        }
+        return new { timestamp, level = eventName, message = message ?? string.Empty };
     }
 
     private static bool IsValidInterval(string interval) =>
